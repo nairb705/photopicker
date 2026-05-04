@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "sharp": "^0.33.4"
+    "sharp": "^0.33.4",
+    "dcraw": "^1.0.4"
   }
 }

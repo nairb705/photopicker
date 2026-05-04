@@ -1,11 +1,13 @@
-import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, readFile, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import sharp from 'sharp';
+import { execFile } from 'child_process';
+import { createRequire } from 'module';
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 
 const RAW_EXTS = new Set([
   'cr2','cr3','crw',
@@ -22,14 +24,11 @@ const RAW_EXTS = new Set([
   'iiq',
   'erf',
   'kdc','dcr',
-  'mef',
-  'mos',
-  'srw',
+  'mef','mos','srw',
 ]);
 
 function isRaw(filename) {
-  const ext = (filename || '').split('.').pop().toLowerCase();
-  return RAW_EXTS.has(ext);
+  return RAW_EXTS.has((filename || '').split('.').pop().toLowerCase());
 }
 
 async function rawToJpeg(base64, filename) {
@@ -41,9 +40,12 @@ async function rawToJpeg(base64, filename) {
   await writeFile(tmpIn, Buffer.from(base64, 'base64'));
 
   try {
-    // dcraw outputs PPM to stdout; pipe into sharp
+    // dcraw npm package bundles the dcraw binary
+    const dcrawBin = require.resolve('dcraw/dcraw');
+
     const { stdout } = await execFileAsync(
-      'dcraw', ['-c', '-w', '-q', '1', tmpIn],
+      dcrawBin,
+      ['-c', '-w', '-q', '1', tmpIn],
       { maxBuffer: 150 * 1024 * 1024, encoding: 'buffer' }
     );
 

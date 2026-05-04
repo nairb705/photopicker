@@ -1,5 +1,6 @@
 {
   "outputDirectory": ".",
+  "buildCommand": "npm install",
   "functions": {
     "api/analyze.js": {
       "memory": 1024,
