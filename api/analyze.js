@@ -2,9 +2,6 @@ import { writeFile, readFile, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import sharp from 'sharp';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 const RAW_EXTS = new Set([
   'cr2','cr3','crw',
@@ -28,31 +25,27 @@ function isRaw(filename) {
   return RAW_EXTS.has((filename || '').split('.').pop().toLowerCase());
 }
 
-async function rawToJpeg(base64, filename) {
-  // dcraw npm package is a pure-JS Emscripten port — no system binary needed
-  const dcraw = require('dcraw');
+async function rawToJpeg(base64) {
+  // Lazy-load dcraw only when actually needed (RAW files)
+  const { default: dcraw } = await import('dcraw');
 
   const rawBuffer = Buffer.from(base64, 'base64');
   const buf = new Uint8Array(rawBuffer);
 
-  // Extract embedded JPEG thumbnail first (fast, high quality for most cameras)
-  let result = dcraw(buf, { exportAsThumbnail: true });
-  let tiffBuf = result && result.files
-    ? Object.values(result.files)[0]
-    : null;
+  // Try embedded thumbnail first (fast path)
+  let tiffBuf = null;
+  try {
+    const result = dcraw(buf, { exportAsThumbnail: true });
+    tiffBuf = result?.files ? Object.values(result.files)[0] : null;
+  } catch(_) {}
 
-  // Fallback: full decode to TIFF if no thumbnail
+  // Fallback: full decode
   if (!tiffBuf) {
-    result = dcraw(buf, {
-      exportAsTiff: true,
-      useCameraWhiteBalance: true,
-    });
-    tiffBuf = result && result.files
-      ? Object.values(result.files)[0]
-      : null;
+    const result = dcraw(buf, { exportAsTiff: true, useCameraWhiteBalance: true });
+    tiffBuf = result?.files ? Object.values(result.files)[0] : null;
   }
 
-  if (!tiffBuf) throw new Error('RAW decode failed: no output from dcraw');
+  if (!tiffBuf) throw new Error('RAW decode failed');
 
   const jpegBuffer = await sharp(Buffer.from(tiffBuf))
     .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
@@ -77,8 +70,9 @@ export default async function handler(req, res) {
   try {
     let { imageBase64, mediaType, filename } = req.body;
 
+    // Only invoke dcraw for actual RAW files
     if (filename && isRaw(filename)) {
-      imageBase64 = await rawToJpeg(imageBase64, filename);
+      imageBase64 = await rawToJpeg(imageBase64);
       mediaType = 'image/jpeg';
     }
 
@@ -120,6 +114,7 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).json({ text });
   } catch (err) {
+    console.error('analyze error:', err);
     return res.status(500).json({ error: 'Processing error', detail: err.message });
   }
 }
