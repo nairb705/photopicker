@@ -383,9 +383,9 @@
       </svg>
     </div>
     <div class="drop-title">사진을 드래그하거나 클릭해서 업로드</div>
-    <div class="drop-sub">JPG · PNG · WEBP — 여러 장 동시 선택 가능</div>
+    <div class="drop-sub">JPG · PNG · WEBP · RAW (CR2/NEF/ARW/RAF/DNG 등) — 여러 장 동시 선택 가능</div>
   </div>
-  <input type="file" id="file-input" multiple accept="image/*">
+  <input type="file" id="file-input" multiple accept="image/*,.cr2,.cr3,.crw,.nef,.nrw,.arw,.sr2,.srf,.raf,.orf,.rw2,.rwl,.dng,.pef,.ptx,.x3f,.mrw,.3fr,.fff,.iiq,.erf,.kdc,.dcr,.mef,.mos,.srw">
 
   <!-- Thumbnails -->
   <div class="thumb-section" id="thumb-section" style="display:none">
@@ -438,6 +438,15 @@
 
   const MAX_PX = 1920;
   const MAX_KB = 900;
+  const RAW_EXTS = new Set([
+    'cr2','cr3','crw','nef','nrw','arw','sr2','srf','raf','orf',
+    'rw2','rwl','dng','pef','ptx','x3f','mrw','3fr','fff','iiq',
+    'erf','kdc','dcr','mef','mos','srw'
+  ]);
+
+  function isRawFile(filename) {
+    return RAW_EXTS.has(filename.split('.').pop().toLowerCase());
+  }
 
   function resizeImage(file) {
     return new Promise(resolve => {
@@ -460,7 +469,7 @@
             quality -= 0.1;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
           }
-          resolve({ src: dataUrl, name: file.name, type: 'image/jpeg' });
+          resolve({ src: dataUrl, name: file.name, type: 'image/jpeg', isRaw: false });
         };
         img.src = e.target.result;
       };
@@ -468,11 +477,30 @@
     });
   }
 
+  function loadRawFile(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        // For RAW we store a placeholder thumbnail and the raw base64 separately
+        resolve({
+          src: e.target.result,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          isRaw: true,
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function handleFiles(files) {
     Array.from(files).forEach(async file => {
-      if (!file.type.startsWith('image/')) return;
-      const resized = await resizeImage(file);
-      images.push(resized);
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!file.type.startsWith('image/') && !RAW_EXTS.has(ext)) return;
+      const processed = isRawFile(file.name)
+        ? await loadRawFile(file)
+        : await resizeImage(file);
+      images.push(processed);
       renderThumbs();
     });
   }
@@ -483,7 +511,13 @@
     images.forEach((img, i) => {
       const wrap = document.createElement('div');
       wrap.className = 'thumb-wrap';
-      wrap.innerHTML = `<img src="${img.src}" alt="${img.name}"><button class="thumb-remove" onclick="removeImage(event,${i})">×</button>`;
+      const thumbContent = img.isRaw
+        ? `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);font-family:'DM Mono',monospace;">
+            <div style="font-size:11px;color:var(--accent);font-weight:500;">${img.name.split('.').pop().toUpperCase()}</div>
+            <div style="font-size:9px;color:var(--text3);margin-top:2px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${img.name}</div>
+           </div>`
+        : `<img src="${img.src}" alt="${img.name}">`;
+      wrap.innerHTML = thumbContent + `<button class="thumb-remove" onclick="removeImage(event,${i})">×</button>`;
       grid.appendChild(wrap);
     });
     const n = images.length;
@@ -605,7 +639,7 @@
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType })
+          body: JSON.stringify({ imageBase64: base64, mediaType, filename: images[repIdx].name })
         });
 
         if (res.status === 401) throw new Error('API_KEY');
