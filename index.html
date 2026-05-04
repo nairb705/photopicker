@@ -522,26 +522,14 @@
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1000,
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-                { type: 'text', text: `이 사진의 품질을 전문 사진작가 관점에서 평가해주세요. 반드시 아래 JSON 형식만 반환 (다른 텍스트 없이):
-{"score":<1~100 정수>,"summary":"<한 줄 요약 20자 이내>","strengths":["<강점1>","<강점2>","<강점3>"],"weaknesses":["<약점1>"]}
-평가 기준: 구도, 선명도, 노출, 색감, 피사체의 표현력을 종합.` }
-              ]
-            }]
-          })
+          body: JSON.stringify({ imageBase64: base64, mediaType })
         });
 
         if (res.status === 401) throw new Error('API_KEY');
         if (!res.ok) throw new Error('API_ERROR');
 
         const data = await res.json();
-        const text = (data.content || []).map(c => c.text || '').join('');
+        const text = data.text || '';
         let parsed;
         try {
           parsed = JSON.parse(text.replace(/```json|```/g, '').trim());

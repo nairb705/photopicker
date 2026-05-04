@@ -13,6 +13,60 @@ photo-picker/
 └── README.md
 ```
 
+---
+
+## Vercel 배포 방법
+
+### 1단계 — GitHub에 올리기
+
+```bash
+git init
+git add .
+git commit -m "init"
+git remote add origin https://github.com/YOUR_ID/photo-picker.git
+git push -u origin main
+```
+
+### 2단계 — Vercel에서 import
+
+1. [vercel.com](https://vercel.com) 로그인 → **Add New Project**
+2. GitHub 레포 선택 → **Import**
+3. Framework Preset: **Other** 선택
+4. **Deploy** 클릭
+
+### 3단계 — API 키 환경변수 설정
+
+배포 후 Vercel 대시보드에서:
+
+1. 프로젝트 → **Settings** → **Environment Variables**
+2. 아래 값 추가:
+
+| Name | Value |
+|------|-------|
+| `OPENAI_API_KEY` | `sk-...` (본인 API 키) |
+
+3. **Save** → 프로젝트 **Redeploy**
+
+> API 키는 `api/analyze.js` 서버 함수에서만 사용되므로 브라우저에 노출되지 않습니다.
+
+---
+
+## 로컬 개발 (선택)
+
+```bash
+npm i -g vercel
+vercel dev
+```
+
+`.env.local` 파일 생성:
+```
+OPENAI_API_KEY=sk-...
+```
+
+브라우저에서 `http://localhost:3000` 열기.
+
+---
+
 ## 사용법
 
 1. 사진을 드래그하거나 클릭해서 여러 장 업로드
