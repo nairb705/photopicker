@@ -1,12 +1,9 @@
-import { promisify } from 'util';
 import { writeFile, readFile, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import sharp from 'sharp';
-import { execFile } from 'child_process';
 import { createRequire } from 'module';
 
-const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 
 const RAW_EXTS = new Set([
@@ -32,34 +29,37 @@ function isRaw(filename) {
 }
 
 async function rawToJpeg(base64, filename) {
-  const ext = filename.split('.').pop().toLowerCase();
-  const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const tmpIn = join(tmpdir(), `raw_${id}.${ext}`);
-  const tmpOut = join(tmpdir(), `raw_${id}.jpg`);
+  // dcraw npm package is a pure-JS Emscripten port — no system binary needed
+  const dcraw = require('dcraw');
 
-  await writeFile(tmpIn, Buffer.from(base64, 'base64'));
+  const rawBuffer = Buffer.from(base64, 'base64');
+  const buf = new Uint8Array(rawBuffer);
 
-  try {
-    // dcraw npm package bundles the dcraw binary
-    const dcrawBin = require.resolve('dcraw/dcraw');
+  // Extract embedded JPEG thumbnail first (fast, high quality for most cameras)
+  let result = dcraw(buf, { exportAsThumbnail: true });
+  let tiffBuf = result && result.files
+    ? Object.values(result.files)[0]
+    : null;
 
-    const { stdout } = await execFileAsync(
-      dcrawBin,
-      ['-c', '-w', '-q', '1', tmpIn],
-      { maxBuffer: 150 * 1024 * 1024, encoding: 'buffer' }
-    );
-
-    await sharp(stdout)
-      .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 88 })
-      .toFile(tmpOut);
-
-    const jpeg = await readFile(tmpOut);
-    return jpeg.toString('base64');
-  } finally {
-    await unlink(tmpIn).catch(() => {});
-    await unlink(tmpOut).catch(() => {});
+  // Fallback: full decode to TIFF if no thumbnail
+  if (!tiffBuf) {
+    result = dcraw(buf, {
+      exportAsTiff: true,
+      useCameraWhiteBalance: true,
+    });
+    tiffBuf = result && result.files
+      ? Object.values(result.files)[0]
+      : null;
   }
+
+  if (!tiffBuf) throw new Error('RAW decode failed: no output from dcraw');
+
+  const jpegBuffer = await sharp(Buffer.from(tiffBuf))
+    .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+
+  return jpegBuffer.toString('base64');
 }
 
 export default async function handler(req, res) {
