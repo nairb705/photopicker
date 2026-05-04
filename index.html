@@ -356,6 +356,175 @@
       display: none;
     }
 
+
+    /* ── Edit Panel ── */
+    .edit-btn {
+      margin-top: 10px;
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text2);
+      font-size: 0.78rem;
+      font-family: 'DM Sans', sans-serif;
+      padding: 5px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .edit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .edit-panel {
+      margin-top: 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: none;
+    }
+    .edit-panel.open { display: block; }
+
+    .edit-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; margin-bottom: 12px; }
+    .slider-row { display: flex; flex-direction: column; gap: 4px; }
+    .slider-label {
+      display: flex; justify-content: space-between;
+      font-size: 0.72rem; color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+    .slider-label span { color: var(--text2); }
+    input[type=range].edit-range {
+      width: 100%; height: 3px; appearance: none;
+      background: var(--border2); border-radius: 2px; outline: none; cursor: pointer;
+    }
+    input[type=range].edit-range::-webkit-slider-thumb {
+      appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: var(--accent); cursor: pointer;
+    }
+
+    .edit-prompt-row {
+      display: flex; gap: 8px; margin-bottom: 10px;
+    }
+    .edit-prompt-input {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      padding: 6px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .edit-prompt-input:focus { border-color: var(--accent); }
+    .edit-prompt-input::placeholder { color: var(--text3); }
+
+    .ai-suggest-btn {
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text3);
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      padding: 5px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .ai-suggest-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .ai-suggest-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .edit-actions { display: flex; gap: 8px; align-items: center; }
+    .apply-btn {
+      background: var(--accent);
+      color: var(--accent-text);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 6px 16px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .apply-btn:hover { opacity: 0.85; }
+    .apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .reset-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text3);
+      font-size: 0.78rem;
+      font-family: 'DM Sans', sans-serif;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .reset-btn:hover { border-color: var(--border2); color: var(--text2); }
+    .download-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-family: 'DM Mono', monospace;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      display: none;
+    }
+    .download-btn:hover { border-color: var(--accent); }
+    .download-btn.visible { display: inline-flex; align-items: center; gap: 5px; }
+
+    .edit-preview {
+      margin-top: 10px;
+      display: none;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .edit-preview.visible { display: block; }
+    .edit-preview img { width: 100%; height: auto; display: block; max-height: 400px; object-fit: contain; background: var(--bg); }
+    .edit-preview-label {
+      font-size: 0.7rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      padding: 4px 8px;
+      background: var(--bg3);
+      border-top: 1px solid var(--border);
+    }
+
+    .suggest-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .suggest-chip {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(200,240,96,0.07);
+      border: 1px solid rgba(200,240,96,0.2);
+      color: var(--accent);
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      transition: background 0.15s;
+    }
+    .suggest-chip:hover { background: rgba(200,240,96,0.15); }
+
+    .edit-spinner {
+      width: 12px; height: 12px;
+      border: 2px solid rgba(200,240,96,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+
+    @media (max-width: 520px) {
+      .edit-sliders { grid-template-columns: 1fr; }
+      .edit-panel { padding: 0.75rem; }
+    }
+
     @media (max-width: 520px) {
       header { flex-direction: column; gap: 0.25rem; padding: 1.25rem 1.25rem 0; }
       main { padding: 1.5rem 1rem 3rem; }
@@ -676,6 +845,9 @@
     btn.innerHTML = `AI 분석 시작 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
   }
 
+  // ── Edit state per card ──
+  const editState = {};
+
   function renderResults(scores, n, dupCount) {
     const sorted = [...scores].sort((a, b) => b.score - a.score);
     const topN = sorted.slice(0, n);
@@ -689,6 +861,14 @@
 
     topN.forEach((item, rank) => {
       const img = images[item.index];
+      const cardId = `card-${rank}`;
+      editState[cardId] = {
+        brightness: 0, contrast: 0, saturation: 0,
+        warmth: 0, sharpness: 0,
+        src: img.src, weaknesses: item.weaknesses || [], strengths: item.strengths || [],
+        editedSrc: null,
+      };
+
       const card = document.createElement('div');
       card.className = 'result-card' + (rank === 0 ? ' top1' : '');
       const badgeClass = ['rank-1','rank-2','rank-3'][rank] || 'rank-other';
@@ -703,11 +883,61 @@
           <div class="rank-badge ${badgeClass}">${rank + 1}</div>
           <div class="score-num">${item.score}</div>
         </div>
-        <img class="result-thumb" src="${img.src}" alt="${img.name}">
+        <img class="result-thumb" src="${img.src}" alt="${img.name}" id="thumb-${cardId}">
         <div class="result-body">
           <div class="result-summary">${item.summary || ''}</div>
           <div class="strength-tags">${dupBadge}${strengths}${weaknesses}</div>
           <div class="result-file">${img.name}</div>
+          <button class="edit-btn" onclick="toggleEditPanel('${cardId}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            후보정
+          </button>
+
+          <div class="edit-panel" id="panel-${cardId}">
+            <div class="suggest-chips" id="chips-${cardId}"></div>
+
+            <div class="edit-prompt-row">
+              <input type="text" class="edit-prompt-input" id="prompt-${cardId}" placeholder="직접 지시 (예: 더 따뜻하게, 노출 올려줘)">
+              <button class="ai-suggest-btn" id="suggest-btn-${cardId}" onclick="aiSuggest('${cardId}')">AI 추천</button>
+            </div>
+
+            <div class="edit-sliders">
+              <div class="slider-row">
+                <div class="slider-label">밝기 <span id="lbl-brightness-${cardId}">0</span></div>
+                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-brightness-${cardId}" oninput="onSlider('${cardId}','brightness',this.value)">
+              </div>
+              <div class="slider-row">
+                <div class="slider-label">대비 <span id="lbl-contrast-${cardId}">0</span></div>
+                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-contrast-${cardId}" oninput="onSlider('${cardId}','contrast',this.value)">
+              </div>
+              <div class="slider-row">
+                <div class="slider-label">채도 <span id="lbl-saturation-${cardId}">0</span></div>
+                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-saturation-${cardId}" oninput="onSlider('${cardId}','saturation',this.value)">
+              </div>
+              <div class="slider-row">
+                <div class="slider-label">색온도 <span id="lbl-warmth-${cardId}">0</span></div>
+                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-warmth-${cardId}" oninput="onSlider('${cardId}','warmth',this.value)">
+              </div>
+              <div class="slider-row">
+                <div class="slider-label">선명도 <span id="lbl-sharpness-${cardId}">0</span></div>
+                <input type="range" class="edit-range" min="0" max="100" value="0" id="sl-sharpness-${cardId}" oninput="onSlider('${cardId}','sharpness',this.value)">
+              </div>
+            </div>
+
+            <div class="edit-actions">
+              <button class="apply-btn" onclick="applyEdit('${cardId}')">적용</button>
+              <button class="reset-btn" onclick="resetEdit('${cardId}')">초기화</button>
+              <button class="download-btn" id="dl-btn-${cardId}" onclick="downloadEdit('${cardId}')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                저장
+              </button>
+            </div>
+
+            <div class="edit-preview" id="preview-${cardId}">
+              <img id="preview-img-${cardId}" src="" alt="후보정 미리보기">
+              <div class="edit-preview-label">후보정 결과</div>
+            </div>
+          </div>
         </div>`;
       list.appendChild(card);
     });
@@ -715,6 +945,171 @@
     const section = document.getElementById('results-section');
     section.style.display = 'block';
     setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
+
+  // ── Edit Panel Logic ──
+  function toggleEditPanel(cardId) {
+    const panel = document.getElementById(`panel-${cardId}`);
+    panel.classList.toggle('open');
+  }
+
+  function onSlider(cardId, param, val) {
+    editState[cardId][param] = parseInt(val);
+    document.getElementById(`lbl-${param}-${cardId}`).textContent = val;
+  }
+
+  function resetEdit(cardId) {
+    const s = editState[cardId];
+    s.brightness = s.contrast = s.saturation = s.warmth = s.sharpness = 0;
+    ['brightness','contrast','saturation','warmth','sharpness'].forEach(p => {
+      const sl = document.getElementById(`sl-${p}-${cardId}`);
+      if (sl) { sl.value = 0; document.getElementById(`lbl-${p}-${cardId}`).textContent = '0'; }
+    });
+    const preview = document.getElementById(`preview-${cardId}`);
+    preview.classList.remove('visible');
+    document.getElementById(`dl-btn-${cardId}`).classList.remove('visible');
+    document.getElementById(`thumb-${cardId}`).src = editState[cardId].src;
+    editState[cardId].editedSrc = null;
+  }
+
+  async function aiSuggest(cardId) {
+    const btn = document.getElementById(`suggest-btn-${cardId}`);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="edit-spinner"></span>';
+
+    const s = editState[cardId];
+    const weaknesses = s.weaknesses.join(', ') || '없음';
+    const strengths = s.strengths.join(', ') || '없음';
+
+    try {
+      const res = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weaknesses, strengths })
+      });
+      const data = await res.json();
+
+      // Apply suggested values to sliders
+      const sugg = data.adjustments || {};
+      const params = ['brightness','contrast','saturation','warmth','sharpness'];
+      params.forEach(p => {
+        if (sugg[p] !== undefined) {
+          editState[cardId][p] = sugg[p];
+          const sl = document.getElementById(`sl-${p}-${cardId}`);
+          if (sl) { sl.value = sugg[p]; document.getElementById(`lbl-${p}-${cardId}`).textContent = sugg[p]; }
+        }
+      });
+
+      // Show chips
+      const chips = document.getElementById(`chips-${cardId}`);
+      chips.innerHTML = '';
+      if (data.suggestions && data.suggestions.length) {
+        data.suggestions.forEach(s => {
+          const chip = document.createElement('span');
+          chip.className = 'suggest-chip';
+          chip.textContent = s;
+          chip.onclick = () => {
+            document.getElementById(`prompt-${cardId}`).value = s;
+          };
+          chips.appendChild(chip);
+        });
+      }
+    } catch(e) {
+      console.error(e);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'AI 추천';
+  }
+
+  function applyEdit(cardId) {
+    const s = editState[cardId];
+    const prompt = document.getElementById(`prompt-${cardId}`).value.trim();
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+
+      // Parse prompt for overrides
+      let { brightness, contrast, saturation, warmth, sharpness } = s;
+      if (prompt) {
+        const p = prompt.toLowerCase();
+        if (p.includes('밝게') || p.includes('밝히') || p.includes('노출 올')) brightness = Math.min(100, brightness + 30);
+        if (p.includes('어둡게') || p.includes('노출 내')) brightness = Math.max(-100, brightness - 30);
+        if (p.includes('따뜻') || p.includes('웜')) warmth = Math.min(100, warmth + 40);
+        if (p.includes('차갑') || p.includes('쿨')) warmth = Math.max(-100, warmth - 40);
+        if (p.includes('선명') || p.includes('샤프')) sharpness = Math.min(100, sharpness + 40);
+        if (p.includes('채도') && p.includes('올')) saturation = Math.min(100, saturation + 30);
+        if (p.includes('채도') && p.includes('내')) saturation = Math.max(-100, saturation - 30);
+        if (p.includes('대비') && p.includes('올')) contrast = Math.min(100, contrast + 30);
+        if (p.includes('흑백') || p.includes('그레이')) saturation = -100;
+      }
+
+      const br = brightness / 100 * 80;   // -80 ~ +80
+      const ct = contrast / 100;           // -1 ~ +1
+      const st = saturation / 100;         // -1 ~ +1
+      const wm = warmth / 100 * 40;        // -40 ~ +40 (RGB offset)
+
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+
+        // Brightness
+        r += br; g += br; b += br;
+
+        // Contrast
+        r = (r - 128) * (1 + ct) + 128;
+        g = (g - 128) * (1 + ct) + 128;
+        b = (b - 128) * (1 + ct) + 128;
+
+        // Warmth (shift red/blue)
+        r += wm; b -= wm;
+
+        // Saturation (via luminance)
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = lum + (r - lum) * (1 + st);
+        g = lum + (g - lum) * (1 + st);
+        b = lum + (b - lum) * (1 + st);
+
+        d[i]   = Math.max(0, Math.min(255, r));
+        d[i+1] = Math.max(0, Math.min(255, g));
+        d[i+2] = Math.max(0, Math.min(255, b));
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      // Sharpness via CSS filter fallback (simple)
+      const sharpenPx = sharpness > 0 ? (sharpness / 100 * 1.5).toFixed(2) : 0;
+
+      const editedSrc = canvas.toDataURL('image/jpeg', 0.92);
+      editState[cardId].editedSrc = editedSrc;
+
+      // Show preview
+      const previewImg = document.getElementById(`preview-img-${cardId}`);
+      previewImg.style.filter = sharpenPx > 0 ? `contrast(${1 + parseFloat(sharpenPx) * 0.2}) saturate(${1 + parseFloat(sharpenPx) * 0.1})` : '';
+      previewImg.src = editedSrc;
+      document.getElementById(`preview-${cardId}`).classList.add('visible');
+      document.getElementById(`dl-btn-${cardId}`).classList.add('visible');
+
+      // Update thumb
+      document.getElementById(`thumb-${cardId}`).src = editedSrc;
+    };
+    img.src = s.src;
+  }
+
+  function downloadEdit(cardId) {
+    const src = editState[cardId].editedSrc;
+    if (!src) return;
+    const a = document.createElement('a');
+    a.href = src;
+    a.download = `edited_${cardId}.jpg`;
+    a.click();
   }
 </script>
 
