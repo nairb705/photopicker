@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhotoPick — AI 사진 선별기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e0f;
+      --bg2: #161618;
+      --bg3: #1e1e21;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0efe8;
+      --text2: #9a9892;
+      --text3: #5a5955;
+      --accent: #c8f060;
+      --accent-dim: rgba(200,240,96,0.12);
+      --accent-text: #0e1a00;
+      --gold: #f5c842;
+      --silver: #b0b8c8;
+      --bronze: #c87840;
+      --danger: #ff5c5c;
+      --radius: 12px;
+      --radius-sm: 7px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 2rem 2rem 0;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .logo span { color: var(--accent); }
+    .tagline {
+      font-size: 0.8rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    /* ── Drop Zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--bg2);
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(200,240,96,0.04);
+    }
+    .drop-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1rem;
+      background: var(--bg3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border2);
+    }
+    .drop-icon svg { width: 22px; height: 22px; stroke: var(--text2); fill: none; }
+    .drop-title {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+    .drop-sub {
+      font-size: 0.8rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+    #file-input { display: none; }
+
+    /* ── Thumbnail Grid ── */
+    .thumb-section { margin-top: 1.5rem; }
+    .thumb-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .thumb-header-label {
+      font-size: 0.78rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .clear-btn {
+      font-size: 0.75rem;
+      color: var(--text3);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .clear-btn:hover { color: var(--danger); }
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 6px;
+    }
+    .thumb-wrap {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      background: var(--bg3);
+    }
+    .thumb-wrap img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      transition: opacity 0.2s;
+    }
+    .thumb-wrap:hover img { opacity: 0.7; }
+    .thumb-remove {
+      position: absolute; top: 4px; right: 4px;
+      background: rgba(0,0,0,0.7);
+      border: none; border-radius: 50%;
+      width: 20px; height: 20px;
+      color: #fff; font-size: 14px;
+      cursor: pointer; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .thumb-wrap:hover .thumb-remove { opacity: 1; }
+
+    /* ── Controls ── */
+    .controls {
+      margin-top: 1.5rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .controls-label {
+      font-size: 0.88rem;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+    .controls-label strong { color: var(--text); font-weight: 500; }
+    .n-input {
+      width: 72px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 1rem;
+      padding: 0.4rem 0.6rem;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.15s;
+      -moz-appearance: textfield;
+    }
+    .n-input::-webkit-outer-spin-button,
+    .n-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .n-input:focus { border-color: var(--accent); }
+    .n-input.error { border-color: var(--danger); }
+    .analyze-btn {
+      margin-left: auto;
+      background: var(--accent);
+      color: var(--accent-text);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.55rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .analyze-btn:hover:not(:disabled) { opacity: 0.88; }
+    .analyze-btn:active:not(:disabled) { transform: scale(0.97); }
+    .analyze-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    .progress-area {
+      margin-top: 1rem;
+      display: none;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 6px;
+    }
+    .progress-bar {
+      height: 3px;
+      background: var(--bg3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* ── Results ── */
+    .results-section { margin-top: 2rem; display: none; }
+    .results-heading {
+      font-size: 0.78rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 1rem;
+    }
+    .result-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      transition: border-color 0.15s;
+    }
+    .result-card:hover { border-color: var(--border2); }
+    .result-card.top1 { border-color: rgba(245,200,66,0.35); }
+    .rank-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .rank-badge {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .rank-1 { background: rgba(245,200,66,0.15); color: var(--gold); border: 1px solid rgba(245,200,66,0.3); }
+    .rank-2 { background: rgba(176,184,200,0.12); color: var(--silver); border: 1px solid rgba(176,184,200,0.25); }
+    .rank-3 { background: rgba(200,120,64,0.12); color: var(--bronze); border: 1px solid rgba(200,120,64,0.25); }
+    .rank-other { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+    .score-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text3);
+    }
+    .result-thumb {
+      width: 80px; height: 80px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+    .result-body { flex: 1; min-width: 0; }
+    .result-summary {
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .strength-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+    .tag {
+      font-size: 0.72rem;
+      padding: 2px 9px;
+      border-radius: 20px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-family: 'DM Mono', monospace;
+    }
+    .tag.weak {
+      background: rgba(255,92,92,0.08);
+      color: rgba(255,92,92,0.7);
+    }
+    .result-file {
+      font-size: 0.7rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 4px;
+    }
+
+    /* ── Loader spinner ── */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(14,26,0,0.3);
+      border-top-color: var(--accent-text);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty / error states ── */
+    .api-key-banner {
+      background: rgba(255,92,92,0.08);
+      border: 1px solid rgba(255,92,92,0.2);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      color: rgba(255,92,92,0.9);
+      margin-top: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      display: none;
+    }
+
+    @media (max-width: 520px) {
+      header { flex-direction: column; gap: 0.25rem; padding: 1.25rem 1.25rem 0; }
+      main { padding: 1.5rem 1rem 3rem; }
+      .controls { flex-direction: column; align-items: flex-start; }
+      .analyze-btn { margin-left: 0; width: 100%; justify-content: center; }
+      .result-thumb { width: 64px; height: 64px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Photo<span>Pick</span></div>
+  <div class="tagline">AI 사진 선별기</div>
+</header>
+
+<main>
+  <!-- Drop Zone -->
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <div class="drop-icon">
+      <svg viewBox="0 0 24 24" stroke-width="1.5">
+        <rect x="3" y="3" width="18" height="18" rx="3" ry="3"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </div>
+    <div class="drop-title">사진을 드래그하거나 클릭해서 업로드</div>
+    <div class="drop-sub">JPG · PNG · WEBP — 여러 장 동시 선택 가능</div>
+  </div>
+  <input type="file" id="file-input" multiple accept="image/*">
+
+  <!-- Thumbnails -->
+  <div class="thumb-section" id="thumb-section" style="display:none">
+    <div class="thumb-header">
+      <span class="thumb-header-label" id="thumb-count-label">0 photos</span>
+      <button class="clear-btn" onclick="clearAll()">전체 삭제</button>
+    </div>
+    <div class="thumb-grid" id="thumb-grid"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls" id="controls" style="display:none">
+    <span class="controls-label">총 <strong id="total-count">0</strong>장 중에서</span>
+    <input type="number" class="n-input" id="n-input" min="1" value="3">
+    <span class="controls-label">장 선별</span>
+    <button class="analyze-btn" id="analyze-btn" onclick="startAnalysis()">
+      AI 분석 시작
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </div>
+  <div class="api-key-banner" id="api-error"></div>
+
+  <!-- Progress -->
+  <div class="progress-area" id="progress-area">
+    <div class="progress-meta">
+      <span id="progress-label">분석 중...</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="results-section">
+    <div class="results-heading" id="results-heading"></div>
+    <div id="results-list"></div>
+  </div>
+</main>
+
+<script>
+  const images = [];
+
+  // ── File input & drag-drop ──
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+  fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+  function handleFiles(files) {
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        images.push({ src: e.target.result, name: file.name, type: file.type || 'image/jpeg' });
+        renderThumbs();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderThumbs() {
+    const grid = document.getElementById('thumb-grid');
+    grid.innerHTML = '';
+    images.forEach((img, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'thumb-wrap';
+      wrap.innerHTML = `<img src="${img.src}" alt="${img.name}"><button class="thumb-remove" onclick="removeImage(event,${i})">×</button>`;
+      grid.appendChild(wrap);
+    });
+    const n = images.length;
+    document.getElementById('thumb-count-label').textContent = `${n} photo${n !== 1 ? 's' : ''}`;
+    document.getElementById('total-count').textContent = n;
+    const nInput = document.getElementById('n-input');
+    nInput.max = Math.max(1, n - 1);
+    if (parseInt(nInput.value) >= n) nInput.value = Math.max(1, n - 1);
+    document.getElementById('thumb-section').style.display = n ? 'block' : 'none';
+    document.getElementById('controls').style.display = n > 1 ? 'flex' : 'none';
+  }
+
+  function removeImage(e, i) {
+    e.stopPropagation();
+    images.splice(i, 1);
+    renderThumbs();
+    document.getElementById('results-section').style.display = 'none';
+  }
+
+  function clearAll() {
+    images.length = 0;
+    renderThumbs();
+    document.getElementById('results-section').style.display = 'none';
+  }
+
+  // ── Analysis ──
+  async function startAnalysis() {
+    const n = parseInt(document.getElementById('n-input').value);
+    const total = images.length;
+    const nInput = document.getElementById('n-input');
+    const apiError = document.getElementById('api-error');
+    apiError.style.display = 'none';
+
+    if (isNaN(n) || n < 1 || n >= total) {
+      nInput.classList.add('error');
+      setTimeout(() => nInput.classList.remove('error'), 1500);
+      return;
+    }
+
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> 분석 중...`;
+
+    const progressArea = document.getElementById('progress-area');
+    const progressFill = document.getElementById('progress-fill');
+    const progressLabel = document.getElementById('progress-label');
+    const progressPct = document.getElementById('progress-pct');
+    progressArea.style.display = 'block';
+
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('results-list').innerHTML = '';
+
+    const scores = [];
+
+    try {
+      for (let i = 0; i < images.length; i++) {
+        const pct = Math.round((i / images.length) * 100);
+        progressLabel.textContent = `사진 ${i + 1}/${images.length} 분석 중...`;
+        progressPct.textContent = pct + '%';
+        progressFill.style.width = pct + '%';
+
+        const base64 = images[i].src.split(',')[1];
+        const mediaType = images[i].type;
+
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+                { type: 'text', text: `이 사진의 품질을 전문 사진작가 관점에서 평가해주세요. 반드시 아래 JSON 형식만 반환 (다른 텍스트 없이):
+{"score":<1~100 정수>,"summary":"<한 줄 요약 20자 이내>","strengths":["<강점1>","<강점2>","<강점3>"],"weaknesses":["<약점1>"]}
+평가 기준: 구도, 선명도, 노출, 색감, 피사체의 표현력을 종합.` }
+              ]
+            }]
+          })
+        });
+
+        if (res.status === 401) throw new Error('API_KEY');
+        if (!res.ok) throw new Error('API_ERROR');
+
+        const data = await res.json();
+        const text = (data.content || []).map(c => c.text || '').join('');
+        let parsed;
+        try {
+          parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+        } catch {
+          parsed = { score: 50, summary: '분석 결과 없음', strengths: [], weaknesses: [] };
+        }
+        scores.push({ ...parsed, index: i });
+      }
+
+      progressLabel.textContent = '분석 완료';
+      progressPct.textContent = '100%';
+      progressFill.style.width = '100%';
+
+      renderResults(scores, n);
+
+    } catch (err) {
+      progressArea.style.display = 'none';
+      if (err.message === 'API_KEY') {
+        apiError.textContent = '⚠ API 키가 유효하지 않습니다. vercel.json 또는 환경변수를 확인하세요.';
+      } else {
+        apiError.textContent = '⚠ 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      }
+      apiError.style.display = 'block';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = `AI 분석 시작 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
+  }
+
+  function renderResults(scores, n) {
+    const sorted = [...scores].sort((a, b) => b.score - a.score);
+    const topN = sorted.slice(0, n);
+
+    document.getElementById('results-heading').textContent = `${images.length}장 중 상위 ${n}장`;
+    const list = document.getElementById('results-list');
+    list.innerHTML = '';
+
+    topN.forEach((item, rank) => {
+      const img = images[item.index];
+      const card = document.createElement('div');
+      card.className = 'result-card' + (rank === 0 ? ' top1' : '');
+      const badgeClass = ['rank-1','rank-2','rank-3'][rank] || 'rank-other';
+      const strengths = (item.strengths || []).map(s => `<span class="tag">${s}</span>`).join('');
+      const weaknesses = (item.weaknesses || []).map(w => `<span class="tag weak">${w}</span>`).join('');
+
+      card.innerHTML = `
+        <div class="rank-col">
+          <div class="rank-badge ${badgeClass}">${rank + 1}</div>
+          <div class="score-num">${item.score}</div>
+        </div>
+        <img class="result-thumb" src="${img.src}" alt="${img.name}">
+        <div class="result-body">
+          <div class="result-summary">${item.summary || ''}</div>
+          <div class="strength-tags">${strengths}${weaknesses}</div>
+          <div class="result-file">${img.name}</div>
+        </div>`;
+      list.appendChild(card);
+    });
+
+    const section = document.getElementById('results-section');
+    section.style.display = 'block';
+    setTimeout(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
+</script>
+
+</body>
+</html>
