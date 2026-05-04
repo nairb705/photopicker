@@ -2,6 +2,7 @@
   "name": "photo-picker",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "sharp": "^0.33.4",
     "dcraw": "1.0.3"
