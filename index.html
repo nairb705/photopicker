@@ -633,6 +633,30 @@
       border-color: var(--accent);
       color: var(--accent);
     }
+    .chips-loading {
+      font-size: 0.72rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+    }
+    .chips-section-label {
+      font-size: 0.7rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      width: 100%;
+      margin-bottom: 5px;
+    }
+    .chips-input-row {
+      width: 100%;
+      margin-top: 8px;
+    }
+    .chips-input-row .edit-prompt-input {
+      width: 100%;
+      font-size: 0.8rem;
+    }
 
     .edit-spinner {
       width: 12px; height: 12px;
@@ -1034,17 +1058,14 @@
             <div class="edit-step">
               <div class="edit-step-label">
                 <span class="step-num">1</span>보정값 설정
-                <span class="step-hint">슬라이더를 조절하거나 AI에게 자동 추천받으세요</span>
+                <span class="step-hint">키워드를 선택하거나 직접 입력하세요</span>
               </div>
 
-              <div class="edit-prompt-row">
-                <input type="text" class="edit-prompt-input" id="prompt-${cardId}" placeholder='예: "더 따뜻하게", "노출 올려줘", "흑백으로"'>
-                <button class="ai-suggest-btn" id="suggest-btn-${cardId}" onclick="aiSuggest('${cardId}')">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                  AI 자동 추천
-                </button>
+              <div class="suggest-chips" id="chips-${cardId}">
+                <div class="chips-loading">
+                  <span class="edit-spinner"></span> AI가 키워드를 분석 중...
+                </div>
               </div>
-              <div class="suggest-chips" id="chips-${cardId}"></div>
 
               <div class="edit-sliders">
                 <div class="slider-row">
@@ -1124,7 +1145,13 @@
   // ── Edit Panel Logic ──
   function toggleEditPanel(cardId) {
     const panel = document.getElementById(`panel-${cardId}`);
+    const isOpening = !panel.classList.contains('open');
     panel.classList.toggle('open');
+    // Auto-run AI keyword suggestion when first opened
+    if (isOpening && !editState[cardId].keywordsLoaded) {
+      editState[cardId].keywordsLoaded = true;
+      aiSuggest(cardId);
+    }
   }
 
   function onSlider(cardId, param, val) {
@@ -1148,9 +1175,8 @@
   }
 
   async function aiSuggest(cardId) {
-    const btn = document.getElementById(`suggest-btn-${cardId}`);
-    btn.disabled = true;
-    btn.innerHTML = '<span class="edit-spinner"></span> 분석 중...';
+    const chips = document.getElementById(`chips-${cardId}`);
+    chips.innerHTML = '<div class="chips-loading"><span class="edit-spinner"></span> AI가 키워드를 분석 중...</div>';
 
     const s = editState[cardId];
     const weaknesses = s.weaknesses.join(', ') || '없음';
@@ -1164,77 +1190,57 @@
       });
       const data = await res.json();
 
-      // Store full adjustments per keyword for later use
-      editState[cardId].keywordAdjustments = data.keywordAdjustments || {};
       editState[cardId].selectedKeywords = new Set();
-
-      // Render keyword chips (multi-select)
-      const chips = document.getElementById(`chips-${cardId}`);
       chips.innerHTML = '';
 
       const allKeywords = data.keywords || data.suggestions || [];
       if (allKeywords.length) {
         // Section label
         const lbl = document.createElement('div');
-        lbl.style.cssText = 'font-size:0.7rem;color:var(--text3);font-family:"DM Mono",monospace;width:100%;margin-bottom:4px;';
-        lbl.textContent = '보정 키워드를 선택하세요 (복수 선택 가능)';
+        lbl.className = 'chips-section-label';
+        lbl.textContent = '키워드 선택 (복수 가능)';
         chips.appendChild(lbl);
 
         allKeywords.forEach(kw => {
           const chip = document.createElement('span');
           chip.className = 'suggest-chip';
           chip.textContent = kw;
-          chip.dataset.kw = kw;
-          chip.onclick = () => {
-            const sel = editState[cardId].selectedKeywords;
-            if (sel.has(kw)) {
-              sel.delete(kw);
-              chip.classList.remove('selected');
-            } else {
-              sel.add(kw);
-              chip.classList.add('selected');
-            }
-            applyKeywordsToSliders(cardId);
-          };
+          chip.onclick = () => toggleKeyword(cardId, kw, chip);
           chips.appendChild(chip);
         });
-
-        // Custom input chip
-        const customWrap = document.createElement('div');
-        customWrap.style.cssText = 'display:flex;gap:6px;margin-top:6px;width:100%;';
-        customWrap.innerHTML = `
-          <input type="text" class="edit-prompt-input" id="custom-kw-${cardId}" placeholder="직접 입력 후 Enter" style="flex:1;font-size:0.78rem;padding:4px 8px;">
-        `;
-        const customInput = customWrap.querySelector('input');
-        customInput.addEventListener('keydown', e => {
-          if (e.key === 'Enter') {
-            const val = customInput.value.trim();
-            if (!val) return;
-            // Add as selected chip
-            const chip = document.createElement('span');
-            chip.className = 'suggest-chip selected';
-            chip.textContent = val;
-            chip.dataset.kw = val;
-            chip.onclick = () => {
-              const sel = editState[cardId].selectedKeywords;
-              if (sel.has(val)) { sel.delete(val); chip.classList.remove('selected'); }
-              else { sel.add(val); chip.classList.add('selected'); }
-              applyKeywordsToSliders(cardId);
-            };
-            chips.insertBefore(chip, customWrap);
-            editState[cardId].selectedKeywords.add(val);
-            applyKeywordsToSliders(cardId);
-            customInput.value = '';
-          }
-        });
-        chips.appendChild(customWrap);
       }
-    } catch(e) {
-      console.error(e);
-    }
 
-    btn.disabled = false;
-    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg> AI 자동 추천`;
+      // Unified input — at the bottom of chips area
+      const inputRow = document.createElement('div');
+      inputRow.className = 'chips-input-row';
+      inputRow.innerHTML = `<input type="text" class="edit-prompt-input" id="custom-kw-${cardId}" placeholder="직접 입력 후 Enter로 추가">`;
+      const customInput = inputRow.querySelector('input');
+      customInput.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        const val = customInput.value.trim();
+        if (!val) return;
+        const chip = document.createElement('span');
+        chip.className = 'suggest-chip selected';
+        chip.textContent = val;
+        chip.onclick = () => toggleKeyword(cardId, val, chip);
+        chips.insertBefore(chip, inputRow);
+        editState[cardId].selectedKeywords.add(val);
+        applyKeywordsToSliders(cardId);
+        customInput.value = '';
+        customInput.focus();
+      });
+      chips.appendChild(inputRow);
+
+    } catch(e) {
+      chips.innerHTML = '<div class="chips-loading" style="color:var(--danger)">키워드 로딩 실패 — 잠시 후 다시 시도해주세요</div>';
+    }
+  }
+
+  function toggleKeyword(cardId, kw, chip) {
+    const sel = editState[cardId].selectedKeywords;
+    if (sel.has(kw)) { sel.delete(kw); chip.classList.remove('selected'); }
+    else             { sel.add(kw);    chip.classList.add('selected'); }
+    applyKeywordsToSliders(cardId);
   }
 
   async function applyKeywordsToSliders(cardId) {
