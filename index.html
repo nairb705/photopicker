@@ -509,6 +509,52 @@
     document.getElementById('results-section').style.display = 'none';
   }
 
+  // ── Similarity (perceptual hash via 16x16 grayscale) ──
+  function getImageHash(src) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const SIZE = 16;
+        const canvas = document.createElement('canvas');
+        canvas.width = SIZE; canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, SIZE, SIZE);
+        const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+        const gray = [];
+        for (let i = 0; i < SIZE * SIZE; i++) {
+          gray.push(0.299 * data[i*4] + 0.587 * data[i*4+1] + 0.114 * data[i*4+2]);
+        }
+        resolve(gray);
+      };
+      img.src = src;
+    });
+  }
+
+  function similarity(hashA, hashB) {
+    let diff = 0;
+    for (let i = 0; i < hashA.length; i++) diff += Math.abs(hashA[i] - hashB[i]);
+    return 1 - diff / (hashA.length * 255);
+  }
+
+  async function groupSimilarImages(threshold = 0.92) {
+    const hashes = await Promise.all(images.map(img => getImageHash(img.src)));
+    const groups = [];
+    const assigned = new Array(images.length).fill(false);
+    for (let i = 0; i < images.length; i++) {
+      if (assigned[i]) continue;
+      const group = [i];
+      assigned[i] = true;
+      for (let j = i + 1; j < images.length; j++) {
+        if (!assigned[j] && similarity(hashes[i], hashes[j]) >= threshold) {
+          group.push(j);
+          assigned[j] = true;
+        }
+      }
+      groups.push(group);
+    }
+    return groups;
+  }
+
   // ── Analysis ──
   async function startAnalysis() {
     const n = parseInt(document.getElementById('n-input').value);
@@ -536,17 +582,25 @@
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('results-list').innerHTML = '';
 
-    const scores = [];
-
     try {
-      for (let i = 0; i < images.length; i++) {
-        const pct = Math.round((i / images.length) * 100);
-        progressLabel.textContent = `사진 ${i + 1}/${images.length} 분석 중...`;
+      // Step 1: group similar images
+      progressLabel.textContent = '유사 사진 그룹핑 중...';
+      progressPct.textContent = '';
+      progressFill.style.width = '5%';
+      const groups = await groupSimilarImages(0.92);
+      const dupCount = images.length - groups.length;
+
+      // Step 2: analyze one representative per group
+      const scores = [];
+      for (let g = 0; g < groups.length; g++) {
+        const pct = Math.round(5 + (g / groups.length) * 93);
+        progressLabel.textContent = `그룹 ${g + 1}/${groups.length} 분석 중...`;
         progressPct.textContent = pct + '%';
         progressFill.style.width = pct + '%';
 
-        const base64 = images[i].src.split(',')[1];
-        const mediaType = images[i].type;
+        const repIdx = groups[g][0];
+        const base64 = images[repIdx].src.split(',')[1];
+        const mediaType = images[repIdx].type;
 
         const res = await fetch('/api/analyze', {
           method: 'POST',
@@ -565,19 +619,19 @@
         } catch {
           parsed = { score: 50, summary: '분석 결과 없음', strengths: [], weaknesses: [] };
         }
-        scores.push({ ...parsed, index: i });
+        scores.push({ ...parsed, index: repIdx, group: groups[g] });
       }
 
       progressLabel.textContent = '분석 완료';
       progressPct.textContent = '100%';
       progressFill.style.width = '100%';
 
-      renderResults(scores, n);
+      renderResults(scores, n, dupCount);
 
     } catch (err) {
       progressArea.style.display = 'none';
       if (err.message === 'API_KEY') {
-        apiError.textContent = '⚠ API 키가 유효하지 않습니다. vercel.json 또는 환경변수를 확인하세요.';
+        apiError.textContent = '⚠ API 키가 유효하지 않습니다. 환경변수를 확인하세요.';
       } else {
         apiError.textContent = '⚠ 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       }
@@ -588,11 +642,14 @@
     btn.innerHTML = `AI 분석 시작 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
   }
 
-  function renderResults(scores, n) {
+  function renderResults(scores, n, dupCount) {
     const sorted = [...scores].sort((a, b) => b.score - a.score);
     const topN = sorted.slice(0, n);
 
-    document.getElementById('results-heading').textContent = `${images.length}장 중 상위 ${n}장`;
+    let heading = `${images.length}장 중 상위 ${n}장`;
+    if (dupCount > 0) heading += ` · 유사 사진 ${dupCount}장 자동 제외`;
+    document.getElementById('results-heading').textContent = heading;
+
     const list = document.getElementById('results-list');
     list.innerHTML = '';
 
@@ -603,6 +660,9 @@
       const badgeClass = ['rank-1','rank-2','rank-3'][rank] || 'rank-other';
       const strengths = (item.strengths || []).map(s => `<span class="tag">${s}</span>`).join('');
       const weaknesses = (item.weaknesses || []).map(w => `<span class="tag weak">${w}</span>`).join('');
+      const dupBadge = item.group.length > 1
+        ? `<span class="tag" style="background:rgba(176,184,200,0.12);color:var(--silver);">유사 ${item.group.length}장 중 최고</span>`
+        : '';
 
       card.innerHTML = `
         <div class="rank-col">
@@ -612,7 +672,7 @@
         <img class="result-thumb" src="${img.src}" alt="${img.name}">
         <div class="result-body">
           <div class="result-summary">${item.summary || ''}</div>
-          <div class="strength-tags">${strengths}${weaknesses}</div>
+          <div class="strength-tags">${dupBadge}${strengths}${weaknesses}</div>
           <div class="result-file">${img.name}</div>
         </div>`;
       list.appendChild(card);
