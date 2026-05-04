@@ -555,6 +555,66 @@
       color: var(--accent);
     }
 
+    /* ── Step labels ── */
+    .edit-step {
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .edit-step:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .edit-step-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text2);
+    }
+    .step-num {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 1px solid rgba(200,240,96,0.3);
+      color: var(--accent);
+      font-size: 0.7rem;
+      font-family: 'DM Mono', monospace;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-hint {
+      font-size: 0.72rem;
+      font-weight: 400;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── Compare hint overlay ── */
+    .compare-hint-overlay {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.6);
+      color: var(--text2);
+      font-size: 0.72rem;
+      font-family: 'DM Mono', monospace;
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: flex; align-items: center; gap: 6px;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      z-index: 20;
+      white-space: nowrap;
+    }
+    .compare-hint-overlay.hidden { opacity: 0; }
+
+    .apply-btn {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .ai-suggest-btn {
+      display: flex; align-items: center; gap: 5px;
+    }
+
     .suggest-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
     .suggest-chip {
       font-size: 0.72rem;
@@ -964,64 +1024,88 @@
           </button>
 
           <div class="edit-panel" id="panel-${cardId}">
-            <div class="suggest-chips" id="chips-${cardId}"></div>
 
-            <div class="edit-prompt-row">
-              <input type="text" class="edit-prompt-input" id="prompt-${cardId}" placeholder="직접 지시 (예: 더 따뜻하게, 노출 올려줘)">
-              <button class="ai-suggest-btn" id="suggest-btn-${cardId}" onclick="aiSuggest('${cardId}')">AI 추천</button>
-            </div>
+            <!-- Step 1 -->
+            <div class="edit-step">
+              <div class="edit-step-label">
+                <span class="step-num">1</span>보정값 설정
+                <span class="step-hint">슬라이더를 조절하거나 AI에게 자동 추천받으세요</span>
+              </div>
 
-            <div class="edit-sliders">
-              <div class="slider-row">
-                <div class="slider-label">밝기 <span id="lbl-brightness-${cardId}">0</span></div>
-                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-brightness-${cardId}" oninput="onSlider('${cardId}','brightness',this.value)">
+              <div class="edit-prompt-row">
+                <input type="text" class="edit-prompt-input" id="prompt-${cardId}" placeholder='예: "더 따뜻하게", "노출 올려줘", "흑백으로"'>
+                <button class="ai-suggest-btn" id="suggest-btn-${cardId}" onclick="aiSuggest('${cardId}')">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                  AI 자동 추천
+                </button>
               </div>
-              <div class="slider-row">
-                <div class="slider-label">대비 <span id="lbl-contrast-${cardId}">0</span></div>
-                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-contrast-${cardId}" oninput="onSlider('${cardId}','contrast',this.value)">
-              </div>
-              <div class="slider-row">
-                <div class="slider-label">채도 <span id="lbl-saturation-${cardId}">0</span></div>
-                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-saturation-${cardId}" oninput="onSlider('${cardId}','saturation',this.value)">
-              </div>
-              <div class="slider-row">
-                <div class="slider-label">색온도 <span id="lbl-warmth-${cardId}">0</span></div>
-                <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-warmth-${cardId}" oninput="onSlider('${cardId}','warmth',this.value)">
-              </div>
-              <div class="slider-row">
-                <div class="slider-label">선명도 <span id="lbl-sharpness-${cardId}">0</span></div>
-                <input type="range" class="edit-range" min="0" max="100" value="0" id="sl-sharpness-${cardId}" oninput="onSlider('${cardId}','sharpness',this.value)">
-              </div>
-            </div>
+              <div class="suggest-chips" id="chips-${cardId}"></div>
 
-            <div class="edit-actions">
-              <button class="apply-btn" onclick="applyEdit('${cardId}')">적용</button>
-              <button class="reset-btn" onclick="resetEdit('${cardId}')">초기화</button>
-              <button class="download-btn" id="dl-btn-${cardId}" onclick="downloadEdit('${cardId}')">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                저장
-              </button>
-            </div>
-
-            <div class="compare-wrap" id="preview-${cardId}">
-              <!-- Before (original) -->
-              <img id="preview-before-${cardId}" src="" alt="원본">
-              <!-- After (edited) clipped by divider -->
-              <div class="compare-after" id="compare-after-${cardId}" style="clip-path: inset(0 50% 0 0);">
-                <img id="preview-after-${cardId}" src="" alt="후보정">
-              </div>
-              <!-- Divider -->
-              <div class="compare-divider" id="compare-div-${cardId}" style="left:50%;">
-                <div class="compare-handle">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="15 18 9 12 15 6"/>
-                    <polyline points="9 18 3 12 9 6" transform="translate(6,0)"/>
-                  </svg>
+              <div class="edit-sliders">
+                <div class="slider-row">
+                  <div class="slider-label">밝기 <span id="lbl-brightness-${cardId}">0</span></div>
+                  <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-brightness-${cardId}" oninput="onSlider('${cardId}','brightness',this.value)">
+                </div>
+                <div class="slider-row">
+                  <div class="slider-label">대비 <span id="lbl-contrast-${cardId}">0</span></div>
+                  <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-contrast-${cardId}" oninput="onSlider('${cardId}','contrast',this.value)">
+                </div>
+                <div class="slider-row">
+                  <div class="slider-label">채도 <span id="lbl-saturation-${cardId}">0</span></div>
+                  <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-saturation-${cardId}" oninput="onSlider('${cardId}','saturation',this.value)">
+                </div>
+                <div class="slider-row">
+                  <div class="slider-label">색온도 <span id="lbl-warmth-${cardId}">0</span></div>
+                  <input type="range" class="edit-range" min="-100" max="100" value="0" id="sl-warmth-${cardId}" oninput="onSlider('${cardId}','warmth',this.value)">
+                </div>
+                <div class="slider-row">
+                  <div class="slider-label">선명도 <span id="lbl-sharpness-${cardId}">0</span></div>
+                  <input type="range" class="edit-range" min="0" max="100" value="0" id="sl-sharpness-${cardId}" oninput="onSlider('${cardId}','sharpness',this.value)">
                 </div>
               </div>
-              <span class="compare-label-before">원본</span>
-              <span class="compare-label-after">후보정</span>
             </div>
+
+            <!-- Step 2 -->
+            <div class="edit-step">
+              <div class="edit-step-label">
+                <span class="step-num">2</span>보정 적용 및 비교
+                <span class="step-hint">적용 후 핸들을 좌우로 드래그해 원본과 비교</span>
+              </div>
+
+              <div class="edit-actions">
+                <button class="apply-btn" onclick="applyEdit('${cardId}')">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  보정 적용
+                </button>
+                <button class="reset-btn" onclick="resetEdit('${cardId}')">초기화</button>
+                <button class="download-btn" id="dl-btn-${cardId}" onclick="downloadEdit('${cardId}')">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  저장
+                </button>
+              </div>
+
+              <div class="compare-wrap" id="preview-${cardId}">
+                <img id="preview-before-${cardId}" src="" alt="원본">
+                <div class="compare-after" id="compare-after-${cardId}" style="clip-path: inset(0 50% 0 0);">
+                  <img id="preview-after-${cardId}" src="" alt="보정 후">
+                </div>
+                <div class="compare-divider" id="compare-div-${cardId}" style="left:50%;">
+                  <div class="compare-handle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="15 18 9 12 15 6"/>
+                      <polyline points="9 18 3 12 9 6" transform="translate(6,0)"/>
+                    </svg>
+                  </div>
+                </div>
+                <span class="compare-label-before">원본</span>
+                <span class="compare-label-after">보정 후</span>
+                <div class="compare-hint-overlay" id="compare-hint-${cardId}">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3M19 9l3 3-3 3M3 12h18"/></svg>
+                  드래그해서 비교
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>`;
       list.appendChild(card);
@@ -1207,14 +1291,15 @@
     if (wrap._sliderBound) return;
     wrap._sliderBound = true;
 
+    const hintEl = document.getElementById(`compare-hint-${cardId}`);
     function setPosition(clientX) {
       const rect = wrap.getBoundingClientRect();
       let pct = (clientX - rect.left) / rect.width;
       pct = Math.max(0.02, Math.min(0.98, pct));
       const pctPx = (pct * 100).toFixed(2) + '%';
       divider.style.left = pctPx;
-      // clip-path: show left portion for "after"
       afterClip.style.clipPath = `inset(0 ${(100 - pct * 100).toFixed(2)}% 0 0)`;
+      if (hintEl) hintEl.classList.add('hidden');
     }
 
     // Set initial 50%
