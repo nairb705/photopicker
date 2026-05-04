@@ -667,6 +667,40 @@
       display: inline-block;
     }
 
+    /* ── Dedup toggle ── */
+    .dedup-toggle {
+      display: flex; align-items: center; gap: 7px;
+      cursor: pointer; user-select: none;
+      font-size: 0.78rem; color: var(--text2);
+    }
+    .dedup-toggle input { display: none; }
+    .dedup-track {
+      width: 32px; height: 18px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 9px;
+      position: relative;
+      transition: background 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+    .dedup-thumb {
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--text3);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .dedup-toggle input:checked + .dedup-track {
+      background: var(--accent-dim);
+      border-color: rgba(200,240,96,0.4);
+    }
+    .dedup-toggle input:checked + .dedup-track .dedup-thumb {
+      transform: translateX(14px);
+      background: var(--accent);
+    }
+    .dedup-label { white-space: nowrap; }
+
     @media (max-width: 520px) {
       .edit-sliders { grid-template-columns: 1fr; }
       .edit-panel { padding: 0.75rem; }
@@ -717,6 +751,11 @@
     <span class="controls-label">총 <strong id="total-count">0</strong>장 중에서</span>
     <input type="number" class="n-input" id="n-input" min="1" value="3">
     <span class="controls-label">장 선별</span>
+    <label class="dedup-toggle" title="유사 사진을 자동으로 묶어 대표 1장만 분석합니다">
+      <input type="checkbox" id="dedup-checkbox" checked>
+      <span class="dedup-track"><span class="dedup-thumb"></span></span>
+      <span class="dedup-label">유사 사진 묶기</span>
+    </label>
     <button class="analyze-btn" id="analyze-btn" onclick="startAnalysis()">
       AI 분석 시작
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -945,12 +984,19 @@
     document.getElementById('results-list').innerHTML = '';
 
     try {
-      // Step 1: group similar images
-      progressLabel.textContent = '유사 사진 그룹핑 중...';
-      progressPct.textContent = '';
-      progressFill.style.width = '5%';
-      const groups = await groupSimilarImages(0.92);
-      const dupCount = images.length - groups.length;
+      // Step 1: group similar images (if toggle is on)
+      const dedupOn = document.getElementById('dedup-checkbox')?.checked !== false;
+      let groups, dupCount;
+      if (dedupOn) {
+        progressLabel.textContent = '유사 사진 그룹핑 중...';
+        progressPct.textContent = '';
+        progressFill.style.width = '5%';
+        groups = await groupSimilarImages(0.92);
+        dupCount = images.length - groups.length;
+      } else {
+        groups = images.map((_, i) => [i]);
+        dupCount = 0;
+      }
 
       // Step 2: analyze one representative per group
       const scores = [];
@@ -1281,7 +1327,6 @@
 
   function applyEdit(cardId) {
     const s = editState[cardId];
-    const prompt = document.getElementById(`prompt-${cardId}`).value.trim();
 
     const img = new Image();
     img.onload = () => {
@@ -1294,20 +1339,7 @@
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const d = imageData.data;
 
-      // Parse prompt for overrides
       let { brightness, contrast, saturation, warmth, sharpness } = s;
-      if (prompt) {
-        const p = prompt.toLowerCase();
-        if (p.includes('밝게') || p.includes('밝히') || p.includes('노출 올')) brightness = Math.min(100, brightness + 30);
-        if (p.includes('어둡게') || p.includes('노출 내')) brightness = Math.max(-100, brightness - 30);
-        if (p.includes('따뜻') || p.includes('웜')) warmth = Math.min(100, warmth + 40);
-        if (p.includes('차갑') || p.includes('쿨')) warmth = Math.max(-100, warmth - 40);
-        if (p.includes('선명') || p.includes('샤프')) sharpness = Math.min(100, sharpness + 40);
-        if (p.includes('채도') && p.includes('올')) saturation = Math.min(100, saturation + 30);
-        if (p.includes('채도') && p.includes('내')) saturation = Math.max(-100, saturation - 30);
-        if (p.includes('대비') && p.includes('올')) contrast = Math.min(100, contrast + 30);
-        if (p.includes('흑백') || p.includes('그레이')) saturation = -100;
-      }
 
       const br = brightness / 100 * 80;   // -80 ~ +80
       const ct = contrast / 100;           // -1 ~ +1
