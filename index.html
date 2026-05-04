@@ -546,13 +546,13 @@
     }
     .compare-label-before {
       left: 8px;
-      background: rgba(0,0,0,0.55);
-      color: var(--text2);
+      background: rgba(14,26,0,0.7);
+      color: var(--accent);
     }
     .compare-label-after {
       right: 8px;
-      background: rgba(14,26,0,0.7);
-      color: var(--accent);
+      background: rgba(0,0,0,0.55);
+      color: var(--text2);
     }
 
     /* ── Step labels ── */
@@ -628,6 +628,11 @@
       transition: background 0.15s;
     }
     .suggest-chip:hover { background: rgba(200,240,96,0.15); }
+    .suggest-chip.selected {
+      background: rgba(200,240,96,0.25);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
 
     .edit-spinner {
       width: 12px; height: 12px;
@@ -1085,9 +1090,9 @@
               </div>
 
               <div class="compare-wrap" id="preview-${cardId}">
-                <img id="preview-before-${cardId}" src="" alt="원본">
-                <div class="compare-after" id="compare-after-${cardId}" style="clip-path: inset(0 50% 0 0);">
-                  <img id="preview-after-${cardId}" src="" alt="보정 후">
+                <img id="preview-after-${cardId}" src="" alt="보정 후">
+                <div class="compare-after" id="compare-after-${cardId}" style="clip-path: inset(0 0 0 50%);">
+                  <img id="preview-before-${cardId}" src="" alt="원본">
                 </div>
                 <div class="compare-divider" id="compare-div-${cardId}" style="left:50%;">
                   <div class="compare-handle">
@@ -1097,8 +1102,8 @@
                     </svg>
                   </div>
                 </div>
-                <span class="compare-label-before">원본</span>
-                <span class="compare-label-after">보정 후</span>
+                <span class="compare-label-before">보정 후</span>
+                <span class="compare-label-after">원본</span>
                 <div class="compare-hint-overlay" id="compare-hint-${cardId}">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3M19 9l3 3-3 3M3 12h18"/></svg>
                   드래그해서 비교
@@ -1145,7 +1150,7 @@
   async function aiSuggest(cardId) {
     const btn = document.getElementById(`suggest-btn-${cardId}`);
     btn.disabled = true;
-    btn.innerHTML = '<span class="edit-spinner"></span>';
+    btn.innerHTML = '<span class="edit-spinner"></span> 분석 중...';
 
     const s = editState[cardId];
     const weaknesses = s.weaknesses.join(', ') || '없음';
@@ -1159,37 +1164,113 @@
       });
       const data = await res.json();
 
-      // Apply suggested values to sliders
-      const sugg = data.adjustments || {};
-      const params = ['brightness','contrast','saturation','warmth','sharpness'];
-      params.forEach(p => {
-        if (sugg[p] !== undefined) {
-          editState[cardId][p] = sugg[p];
-          const sl = document.getElementById(`sl-${p}-${cardId}`);
-          if (sl) { sl.value = sugg[p]; document.getElementById(`lbl-${p}-${cardId}`).textContent = sugg[p]; }
-        }
-      });
+      // Store full adjustments per keyword for later use
+      editState[cardId].keywordAdjustments = data.keywordAdjustments || {};
+      editState[cardId].selectedKeywords = new Set();
 
-      // Show chips
+      // Render keyword chips (multi-select)
       const chips = document.getElementById(`chips-${cardId}`);
       chips.innerHTML = '';
-      if (data.suggestions && data.suggestions.length) {
-        data.suggestions.forEach(s => {
+
+      const allKeywords = data.keywords || data.suggestions || [];
+      if (allKeywords.length) {
+        // Section label
+        const lbl = document.createElement('div');
+        lbl.style.cssText = 'font-size:0.7rem;color:var(--text3);font-family:"DM Mono",monospace;width:100%;margin-bottom:4px;';
+        lbl.textContent = '보정 키워드를 선택하세요 (복수 선택 가능)';
+        chips.appendChild(lbl);
+
+        allKeywords.forEach(kw => {
           const chip = document.createElement('span');
           chip.className = 'suggest-chip';
-          chip.textContent = s;
+          chip.textContent = kw;
+          chip.dataset.kw = kw;
           chip.onclick = () => {
-            document.getElementById(`prompt-${cardId}`).value = s;
+            const sel = editState[cardId].selectedKeywords;
+            if (sel.has(kw)) {
+              sel.delete(kw);
+              chip.classList.remove('selected');
+            } else {
+              sel.add(kw);
+              chip.classList.add('selected');
+            }
+            applyKeywordsToSliders(cardId);
           };
           chips.appendChild(chip);
         });
+
+        // Custom input chip
+        const customWrap = document.createElement('div');
+        customWrap.style.cssText = 'display:flex;gap:6px;margin-top:6px;width:100%;';
+        customWrap.innerHTML = `
+          <input type="text" class="edit-prompt-input" id="custom-kw-${cardId}" placeholder="직접 입력 후 Enter" style="flex:1;font-size:0.78rem;padding:4px 8px;">
+        `;
+        const customInput = customWrap.querySelector('input');
+        customInput.addEventListener('keydown', e => {
+          if (e.key === 'Enter') {
+            const val = customInput.value.trim();
+            if (!val) return;
+            // Add as selected chip
+            const chip = document.createElement('span');
+            chip.className = 'suggest-chip selected';
+            chip.textContent = val;
+            chip.dataset.kw = val;
+            chip.onclick = () => {
+              const sel = editState[cardId].selectedKeywords;
+              if (sel.has(val)) { sel.delete(val); chip.classList.remove('selected'); }
+              else { sel.add(val); chip.classList.add('selected'); }
+              applyKeywordsToSliders(cardId);
+            };
+            chips.insertBefore(chip, customWrap);
+            editState[cardId].selectedKeywords.add(val);
+            applyKeywordsToSliders(cardId);
+            customInput.value = '';
+          }
+        });
+        chips.appendChild(customWrap);
       }
     } catch(e) {
       console.error(e);
     }
 
     btn.disabled = false;
-    btn.textContent = 'AI 추천';
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg> AI 자동 추천`;
+  }
+
+  async function applyKeywordsToSliders(cardId) {
+    const selected = [...(editState[cardId].selectedKeywords || [])];
+    if (!selected.length) {
+      // Reset sliders to 0
+      ['brightness','contrast','saturation','warmth','sharpness'].forEach(p => {
+        editState[cardId][p] = 0;
+        const sl = document.getElementById(`sl-${p}-${cardId}`);
+        if (sl) { sl.value = 0; document.getElementById(`lbl-${p}-${cardId}`).textContent = '0'; }
+      });
+      return;
+    }
+
+    // Ask AI to compute combined adjustments for selected keywords
+    const s = editState[cardId];
+    try {
+      const res = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weaknesses: s.weaknesses.join(', ') || '없음',
+          strengths: s.strengths.join(', ') || '없음',
+          keywords: selected,
+        })
+      });
+      const data = await res.json();
+      const sugg = data.adjustments || {};
+      ['brightness','contrast','saturation','warmth','sharpness'].forEach(p => {
+        if (sugg[p] !== undefined) {
+          editState[cardId][p] = sugg[p];
+          const sl = document.getElementById(`sl-${p}-${cardId}`);
+          if (sl) { sl.value = sugg[p]; document.getElementById(`lbl-${p}-${cardId}`).textContent = sugg[p]; }
+        }
+      });
+    } catch(e) { console.error(e); }
   }
 
   function applyEdit(cardId) {
@@ -1262,11 +1343,11 @@
 
       // Show compare slider
       const sharpenFilter = sharpenPx > 0 ? `contrast(${1 + parseFloat(sharpenPx) * 0.2}) saturate(${1 + parseFloat(sharpenPx) * 0.1})` : '';
-      const beforeImg = document.getElementById(`preview-before-${cardId}`);
-      const afterImg  = document.getElementById(`preview-after-${cardId}`);
-      beforeImg.src = s.src;
-      afterImg.src  = editedSrc;
+      const afterImg  = document.getElementById(`preview-after-${cardId}`);   // base = 보정 후
+      const beforeImg = document.getElementById(`preview-before-${cardId}`); // overlay = 원본
+      afterImg.src    = editedSrc;   // base layer: 보정 후 (left side)
       afterImg.style.filter = sharpenFilter;
+      beforeImg.src   = s.src;       // overlay layer: 원본 (right side, clipped left)
 
       const wrap = document.getElementById(`preview-${cardId}`);
       wrap.classList.add('visible');
@@ -1298,7 +1379,7 @@
       pct = Math.max(0.02, Math.min(0.98, pct));
       const pctPx = (pct * 100).toFixed(2) + '%';
       divider.style.left = pctPx;
-      afterClip.style.clipPath = `inset(0 ${(100 - pct * 100).toFixed(2)}% 0 0)`;
+      afterClip.style.clipPath = `inset(0 0 0 ${(pct * 100).toFixed(2)}%)`;
       if (hintEl) hintEl.classList.add('hidden');
     }
 
