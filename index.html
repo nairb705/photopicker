@@ -6,6 +6,7 @@
   <title>PhotoPick — AI 사진 선별기</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -566,13 +567,13 @@
     }
     .compare-label-before {
       left: 8px;
-      background: rgba(14,26,0,0.7);
-      color: var(--accent);
+      background: rgba(0,0,0,0.55);
+      color: var(--text2);
     }
     .compare-label-after {
       right: 8px;
-      background: rgba(0,0,0,0.55);
-      color: var(--text2);
+      background: rgba(14,26,0,0.7);
+      color: var(--accent);
     }
 
     /* ── Step labels ── */
@@ -740,30 +741,39 @@
     }
 
     /* ── Filename tooltip ── */
+    /* thumb-wrap has overflow:hidden, so tooltip must live outside it.
+       We use a ::after-based approach via JS inserting into the group/grid,
+       but the simplest fix is to allow overflow on hover via a wrapper.
+       Instead: place tooltip on the thumb-wrap itself but override overflow. */
+    .thumb-wrap { overflow: visible !important; }
+    .thumb-wrap img, .thumb-wrap > div:first-child {
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
     .thumb-tooltip {
       position: absolute;
       bottom: calc(100% + 6px);
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.85);
+      background: rgba(10,10,12,0.92);
       color: var(--text);
       font-size: 0.65rem;
       font-family: 'DM Mono', monospace;
-      padding: 4px 8px;
+      padding: 5px 9px;
       border-radius: 5px;
+      border: 1px solid var(--border2);
       white-space: nowrap;
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.15s;
-      z-index: 50;
-      max-width: 220px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.5;
+      z-index: 100;
+      max-width: 240px;
+      line-height: 1.6;
     }
     .thumb-tooltip .tt-dim { color: var(--text3); }
-    .thumb-group:hover .thumb-tooltip,
-    .thumb-wrap:hover .thumb-tooltip,
+    .thumb-wrap:hover .thumb-tooltip { opacity: 1; }
+    .stack-slot.rep { overflow: visible; }
     .stack-slot.rep:hover .thumb-tooltip { opacity: 1; }
     /* rep = representative (front) */
     .stack-slot.rep {
@@ -1389,9 +1399,9 @@
               </div>
 
               <div class="compare-wrap" id="preview-${cardId}">
-                <img id="preview-after-${cardId}" src="" alt="보정 후">
+                <img id="preview-before-${cardId}" src="" alt="원본">
                 <div class="compare-after" id="compare-after-${cardId}" style="clip-path: inset(0 0 0 50%);">
-                  <img id="preview-before-${cardId}" src="" alt="원본">
+                  <img id="preview-after-${cardId}" src="" alt="보정 후">
                 </div>
                 <div class="compare-divider" id="compare-div-${cardId}" style="left:50%;">
                   <div class="compare-handle">
@@ -1401,8 +1411,8 @@
                     </svg>
                   </div>
                 </div>
-                <span class="compare-label-before">보정 후</span>
-                <span class="compare-label-after">원본</span>
+                <span class="compare-label-before">원본</span>
+                <span class="compare-label-after">보정 후</span>
                 <div class="compare-hint-overlay" id="compare-hint-${cardId}">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3M19 9l3 3-3 3M3 12h18"/></svg>
                   드래그해서 비교
@@ -1613,11 +1623,11 @@
 
       // Show compare slider
       const sharpenFilter = sharpenPx > 0 ? `contrast(${1 + parseFloat(sharpenPx) * 0.2}) saturate(${1 + parseFloat(sharpenPx) * 0.1})` : '';
-      const afterImg  = document.getElementById(`preview-after-${cardId}`);   // base = 보정 후
-      const beforeImg = document.getElementById(`preview-before-${cardId}`); // overlay = 원본
-      afterImg.src    = editedSrc;   // base layer: 보정 후 (left side)
+      const beforeImg = document.getElementById(`preview-before-${cardId}`); // base = 원본 (left)
+      const afterImg  = document.getElementById(`preview-after-${cardId}`);  // overlay = 보정 후 (right)
+      beforeImg.src   = s.src;       // base layer: 원본 (left side)
+      afterImg.src    = editedSrc;   // overlay layer: 보정 후 (right side, clipped left)
       afterImg.style.filter = sharpenFilter;
-      beforeImg.src   = s.src;       // overlay layer: 원본 (right side, clipped left)
 
       const wrap = document.getElementById(`preview-${cardId}`);
       wrap.classList.add('visible');
@@ -1668,11 +1678,30 @@
   }
 
   function downloadEdit(cardId) {
-    const src = editState[cardId].editedSrc;
-    if (!src) return;
+    const s = editState[cardId];
+    if (!s.editedSrc) return;
+
+    const originalName = s.src ? '' : '';
+    let finalSrc = s.editedSrc;
+
+    // Try to copy EXIF from original to edited JPEG
+    try {
+      if (typeof piexif !== 'undefined' && s.src && s.src.startsWith('data:image/jpeg')) {
+        const exifObj = piexif.load(s.src);
+        const exifBytes = piexif.dump(exifObj);
+        finalSrc = piexif.insert(exifBytes, s.editedSrc);
+      }
+    } catch(e) {
+      // If EXIF copy fails (e.g. no EXIF in original), just use edited as-is
+      console.warn('EXIF copy skipped:', e.message);
+    }
+
+    // Derive filename from the image index stored in editState
+    const imgName = images[parseInt(cardId.split('-')[1])]?.name || 'photo';
+    const base = imgName.replace(/\.[^.]+$/, '');
     const a = document.createElement('a');
-    a.href = src;
-    a.download = `edited_${cardId}.jpg`;
+    a.href = finalSrc;
+    a.download = `${base}_edited.jpg`;
     a.click();
   }
 </script>
