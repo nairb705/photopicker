@@ -957,7 +957,7 @@
             quality -= 0.1;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
           }
-          resolve({ src: dataUrl, name: file.name, type: 'image/jpeg', isRaw: false, exifObj });
+          resolve({ src: dataUrl, originalSrc: e.target.result, name: file.name, type: 'image/jpeg', isRaw: false, exifObj });
         };
         img.src = originalDataUrl;
       };
@@ -1327,7 +1327,9 @@
         brightness: 0, contrast: 0, saturation: 0,
         warmth: 0, sharpness: 0,
         src: img.src,
-        exifObj: img.exifObj || null,   // preserved from original upload
+        originalSrc: img.originalSrc || img.src,  // full-res original for saving
+        imgName: img.name,                         // original filename
+        exifObj: img.exifObj || null,
         weaknesses: item.weaknesses || [], strengths: item.strengths || [],
         editedSrc: null,
       };
@@ -1697,32 +1699,66 @@
     const s = editState[cardId];
     if (!s.editedSrc) return;
 
-    let finalSrc = s.editedSrc;
+    // Re-apply pixel edits at full original resolution
+    const fullImg = new Image();
+    fullImg.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width  = fullImg.naturalWidth;
+      canvas.height = fullImg.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(fullImg, 0, 0);
 
-    // Inject EXIF extracted at upload time (before Canvas stripped it)
-    if (typeof piexif !== 'undefined' && s.exifObj) {
-      try {
-        // Remove thumbnail sub-IFD (can cause issues after resize)
-        const exifObj = JSON.parse(JSON.stringify(s.exifObj));
-        delete exifObj['1'];   // thumbnail IFD
-        // Update pixel dimension tags to match edited size
-        if (exifObj['Exif']) {
-          delete exifObj['Exif'][piexif.ExifIFD.PixelXDimension];
-          delete exifObj['Exif'][piexif.ExifIFD.PixelYDimension];
-        }
-        const exifBytes = piexif.dump(exifObj);
-        finalSrc = piexif.insert(exifBytes, s.editedSrc);
-      } catch(e) {
-        console.warn('EXIF inject failed:', e.message);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+
+      const { brightness, contrast, saturation, warmth } = s;
+      const br = brightness / 100 * 80;
+      const ct = contrast / 100;
+      const st = saturation / 100;
+      const wm = warmth / 100 * 40;
+
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+        r += br; g += br; b += br;
+        r = (r - 128) * (1 + ct) + 128;
+        g = (g - 128) * (1 + ct) + 128;
+        b = (b - 128) * (1 + ct) + 128;
+        r += wm; b -= wm;
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = lum + (r - lum) * (1 + st);
+        g = lum + (g - lum) * (1 + st);
+        b = lum + (b - lum) * (1 + st);
+        d[i]   = Math.max(0, Math.min(255, r));
+        d[i+1] = Math.max(0, Math.min(255, g));
+        d[i+2] = Math.max(0, Math.min(255, b));
       }
-    }
+      ctx.putImageData(imageData, 0, 0);
 
-    const imgName = images[parseInt(cardId.split('-')[1])]?.name || 'photo';
-    const base = imgName.replace(/\.[^.]+$/, '');
-    const a = document.createElement('a');
-    a.href = finalSrc;
-    a.download = `${base}_edited.jpg`;
-    a.click();
+      let finalSrc = canvas.toDataURL('image/jpeg', 0.95);
+
+      // Inject original EXIF
+      if (typeof piexif !== 'undefined' && s.exifObj) {
+        try {
+          const exifObj = JSON.parse(JSON.stringify(s.exifObj));
+          delete exifObj['1']; // remove thumbnail IFD
+          if (exifObj['Exif']) {
+            delete exifObj['Exif'][piexif.ExifIFD.PixelXDimension];
+            delete exifObj['Exif'][piexif.ExifIFD.PixelYDimension];
+          }
+          finalSrc = piexif.insert(piexif.dump(exifObj), finalSrc);
+        } catch(e) {
+          console.warn('EXIF inject failed:', e.message);
+        }
+      }
+
+      // Use original filename, strip extension, append _edited
+      const base = (s.imgName || 'photo').replace(/\.[^.]+$/, '');
+      const a = document.createElement('a');
+      a.href = finalSrc;
+      a.download = `${base}_edited.jpg`;
+      a.click();
+    };
+    fullImg.src = s.originalSrc || s.src;
   }
 </script>
 
