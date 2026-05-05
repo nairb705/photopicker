@@ -922,10 +922,24 @@
     return RAW_EXTS.has(filename.split('.').pop().toLowerCase());
   }
 
+  function extractExif(dataUrl) {
+    // Extract raw EXIF bytes from original JPEG before Canvas strips them
+    try {
+      if (typeof piexif !== 'undefined' && dataUrl.startsWith('data:image/jpeg')) {
+        return piexif.load(dataUrl); // returns exifObj
+      }
+    } catch(e) {}
+    return null;
+  }
+
   function resizeImage(file) {
     return new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = e => {
+        const originalDataUrl = e.target.result;
+        // Extract EXIF from original BEFORE canvas processing strips it
+        const exifObj = extractExif(originalDataUrl);
+
         const img = new Image();
         img.onload = () => {
           let { width, height } = img;
@@ -943,9 +957,9 @@
             quality -= 0.1;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
           }
-          resolve({ src: dataUrl, name: file.name, type: 'image/jpeg', isRaw: false });
+          resolve({ src: dataUrl, name: file.name, type: 'image/jpeg', isRaw: false, exifObj });
         };
-        img.src = e.target.result;
+        img.src = originalDataUrl;
       };
       reader.readAsDataURL(file);
     });
@@ -1312,7 +1326,9 @@
       editState[cardId] = {
         brightness: 0, contrast: 0, saturation: 0,
         warmth: 0, sharpness: 0,
-        src: img.src, weaknesses: item.weaknesses || [], strengths: item.strengths || [],
+        src: img.src,
+        exifObj: img.exifObj || null,   // preserved from original upload
+        weaknesses: item.weaknesses || [], strengths: item.strengths || [],
         editedSrc: null,
       };
 
@@ -1681,22 +1697,26 @@
     const s = editState[cardId];
     if (!s.editedSrc) return;
 
-    const originalName = s.src ? '' : '';
     let finalSrc = s.editedSrc;
 
-    // Try to copy EXIF from original to edited JPEG
-    try {
-      if (typeof piexif !== 'undefined' && s.src && s.src.startsWith('data:image/jpeg')) {
-        const exifObj = piexif.load(s.src);
+    // Inject EXIF extracted at upload time (before Canvas stripped it)
+    if (typeof piexif !== 'undefined' && s.exifObj) {
+      try {
+        // Remove thumbnail sub-IFD (can cause issues after resize)
+        const exifObj = JSON.parse(JSON.stringify(s.exifObj));
+        delete exifObj['1'];   // thumbnail IFD
+        // Update pixel dimension tags to match edited size
+        if (exifObj['Exif']) {
+          delete exifObj['Exif'][piexif.ExifIFD.PixelXDimension];
+          delete exifObj['Exif'][piexif.ExifIFD.PixelYDimension];
+        }
         const exifBytes = piexif.dump(exifObj);
         finalSrc = piexif.insert(exifBytes, s.editedSrc);
+      } catch(e) {
+        console.warn('EXIF inject failed:', e.message);
       }
-    } catch(e) {
-      // If EXIF copy fails (e.g. no EXIF in original), just use edited as-is
-      console.warn('EXIF copy skipped:', e.message);
     }
 
-    // Derive filename from the image index stored in editState
     const imgName = images[parseInt(cardId.split('-')[1])]?.name || 'photo';
     const base = imgName.replace(/\.[^.]+$/, '');
     const a = document.createElement('a');
