@@ -695,46 +695,51 @@
     /* ── Group: stack card ── */
     .thumb-group { display: contents; }
 
+    /*
+     * A grouped slot: fixed 80×80 block with relative positioning.
+     * Children are layered via absolute inside this fixed box.
+     * Using a wrapper div (not the thumb-wrap itself) so the grid
+     * cell has a real height.
+     */
     .thumb-group.grouped {
       position: relative;
       width: 80px;
       height: 80px;
       flex-shrink: 0;
+      display: block;        /* real block so flex parent sees height */
     }
 
-    /* All thumbs inside a group fill the slot */
-    .thumb-group.grouped .thumb-wrap {
-      position: absolute !important;
-      top: 0; left: 0;
-      width: 80px !important;
-      height: 80px !important;
-    }
+    /* Hide all thumb-wraps inside grouped — we use .stack-slot instead */
+    .thumb-group.grouped .thumb-wrap { display: none; }
 
-    /* Representative (first child thumb-wrap) on top */
-    .thumb-group.grouped .thumb-wrap:first-of-type {
-      z-index: 3;
+    /* Stack slots rendered by JS */
+    .stack-slot {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border);
     }
-
-    /* Stack layers: shift each one slightly */
-    .thumb-group.grouped.multi .thumb-wrap:nth-of-type(2) {
-      top: -3px; left: 3px; z-index: 2;
-      opacity: 1; filter: brightness(0.6);
+    .stack-slot img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+    }
+    /* rep = representative (front) */
+    .stack-slot.rep {
+      top: 0; left: 0; z-index: 3;
+      border-color: rgba(200,240,96,0.55);
+      box-shadow: 0 0 0 1px rgba(200,240,96,0.18);
+    }
+    .stack-slot.back1 {
+      top: -4px; left: 4px; z-index: 2;
+      filter: brightness(0.55);
       pointer-events: none;
     }
-    .thumb-group.grouped.multi .thumb-wrap:nth-of-type(3) {
-      top: -6px; left: 6px; z-index: 1;
-      opacity: 1; filter: brightness(0.35);
+    .stack-slot.back2 {
+      top: -8px; left: 8px; z-index: 1;
+      filter: brightness(0.3);
       pointer-events: none;
-    }
-    /* Any beyond 3rd: hidden */
-    .thumb-group.grouped.multi .thumb-wrap:nth-of-type(n+4) {
-      display: none;
-    }
-
-    /* Accent border on rep */
-    .thumb-group.grouped.multi .thumb-wrap:first-of-type {
-      border-color: rgba(200,240,96,0.6) !important;
-      box-shadow: 0 0 0 1px rgba(200,240,96,0.2);
     }
 
     /* Badge */
@@ -746,7 +751,7 @@
       align-items: center;
       position: absolute;
       bottom: -7px; right: -7px;
-      font-size: 0.58rem;
+      font-size: 0.6rem;
       font-family: 'DM Mono', monospace;
       font-weight: 700;
       background: var(--accent);
@@ -946,16 +951,55 @@
         groupEl.className = 'thumb-group grouped' + (isMulti ? ' multi' : '');
 
         if (isMulti) {
+          // Back layers (up to 2 extra) — darkened copies
+          const backClasses = ['back2', 'back1'];
+          const extras = group.slice(1, 3).reverse(); // show up to 2 behind
+          extras.forEach((idx, bi) => {
+            const slot = document.createElement('div');
+            slot.className = 'stack-slot ' + backClasses[bi];
+            const img = images[idx];
+            if (img.isRaw) {
+              slot.style.cssText = 'background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);font-family:DM Mono,monospace;';
+              slot.textContent = img.name.split('.').pop().toUpperCase();
+            } else {
+              const im = document.createElement('img');
+              im.src = img.src; im.alt = img.name;
+              slot.appendChild(im);
+            }
+            groupEl.appendChild(slot);
+          });
+
+          // Badge
           const badge = document.createElement('div');
           badge.className = 'group-badge';
-          badge.textContent = `${group.length}장`;
+          badge.textContent = group.length + '장';
           groupEl.appendChild(badge);
         }
 
-        // Only render representative (first) visually; rest are hidden via CSS
-        group.forEach(idx => {
-          groupEl.appendChild(makeThumbEl(images[idx], idx));
-        });
+        // Representative (front) slot
+        const repIdx = group[0];
+        const repImg = images[repIdx];
+        const repSlot = document.createElement('div');
+        repSlot.className = 'stack-slot rep';
+        if (repImg.isRaw) {
+          repSlot.style.cssText = 'background:var(--bg3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;';
+          repSlot.innerHTML = `<span style="font-size:11px;color:var(--accent);font-weight:500;">${repImg.name.split('.').pop().toUpperCase()}</span><span style="font-size:9px;color:var(--text3);max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${repImg.name}</span>`;
+        } else {
+          const im = document.createElement('img');
+          im.src = repImg.src; im.alt = repImg.name;
+          repSlot.appendChild(im);
+        }
+        // Remove button on rep
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'thumb-remove';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = (e) => { e.stopPropagation(); removeImage(e, repIdx); };
+        repSlot.appendChild(removeBtn);
+        groupEl.appendChild(repSlot);
+
+        // Hidden original thumb-wraps (for removeImage index tracking)
+        group.forEach(idx => groupEl.appendChild(makeThumbEl(images[idx], idx)));
+
         grid.appendChild(groupEl);
       });
     } else {
