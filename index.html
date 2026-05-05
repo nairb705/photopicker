@@ -667,39 +667,64 @@
       display: inline-block;
     }
 
-    /* ── Dedup toggle ── */
-    .dedup-toggle {
-      display: flex; align-items: center; gap: 7px;
-      cursor: pointer; user-select: none;
-      font-size: 0.78rem; color: var(--text2);
+    /* ── Dedup button & group visuals ── */
+    .dedup-btn {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.72rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--text3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
     }
-    .dedup-toggle input { display: none; }
-    .dedup-track {
-      width: 32px; height: 18px;
-      background: var(--bg3);
-      border: 1px solid var(--border2);
-      border-radius: 9px;
+    .dedup-btn:hover { color: var(--accent); border-color: rgba(200,240,96,0.4); }
+    .dedup-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+    .dedup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Group container in thumb grid */
+    .thumb-group {
+      display: contents; /* default: no visual grouping */
+    }
+    .thumb-group.grouped {
+      display: flex;
+      align-items: flex-start;
+      gap: 3px;
+      background: rgba(200,240,96,0.05);
+      border: 1px solid rgba(200,240,96,0.2);
+      border-radius: var(--radius-sm);
+      padding: 4px;
       position: relative;
-      transition: background 0.2s, border-color 0.2s;
-      flex-shrink: 0;
     }
-    .dedup-thumb {
+    .thumb-group.grouped .group-badge {
+      display: flex;
+    }
+    .group-badge {
+      display: none;
       position: absolute;
-      top: 2px; left: 2px;
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      background: var(--text3);
-      transition: transform 0.2s, background 0.2s;
-    }
-    .dedup-toggle input:checked + .dedup-track {
-      background: var(--accent-dim);
-      border-color: rgba(200,240,96,0.4);
-    }
-    .dedup-toggle input:checked + .dedup-track .dedup-thumb {
-      transform: translateX(14px);
+      top: -8px; left: 4px;
+      font-size: 0.6rem;
+      font-family: 'DM Mono', monospace;
       background: var(--accent);
+      color: var(--accent-text);
+      padding: 1px 6px;
+      border-radius: 20px;
+      white-space: nowrap;
+      z-index: 2;
     }
-    .dedup-label { white-space: nowrap; }
+    .thumb-group.grouped .thumb-wrap {
+      flex-shrink: 0;
+      width: 52px; height: 52px;
+    }
+    .thumb-group.grouped .thumb-wrap:not(:first-of-type) {
+      opacity: 0.45;
+    }
+    .thumb-group.grouped .thumb-wrap:not(:first-of-type) .thumb-remove {
+      display: none;
+    }
 
     @media (max-width: 520px) {
       .edit-sliders { grid-template-columns: 1fr; }
@@ -741,7 +766,13 @@
   <div class="thumb-section" id="thumb-section" style="display:none">
     <div class="thumb-header">
       <span class="thumb-header-label" id="thumb-count-label">0 photos</span>
-      <button class="clear-btn" onclick="clearAll()">전체 삭제</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="dedup-btn" id="dedup-btn" onclick="toggleDedup()">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="14" height="14" rx="2"/><path d="M16 3h3a2 2 0 0 1 2 2v14"/></svg>
+          유사 사진 묶기
+        </button>
+        <button class="clear-btn" onclick="clearAll()">전체 삭제</button>
+      </div>
     </div>
     <div class="thumb-grid" id="thumb-grid"></div>
   </div>
@@ -751,11 +782,6 @@
     <span class="controls-label">총 <strong id="total-count">0</strong>장 중에서</span>
     <input type="number" class="n-input" id="n-input" min="1" value="3">
     <span class="controls-label">장 선별</span>
-    <label class="dedup-toggle" title="유사 사진을 자동으로 묶어 대표 1장만 분석합니다">
-      <input type="checkbox" id="dedup-checkbox" checked>
-      <span class="dedup-track"><span class="dedup-thumb"></span></span>
-      <span class="dedup-label">유사 사진 묶기</span>
-    </label>
     <button class="analyze-btn" id="analyze-btn" onclick="startAnalysis()">
       AI 분석 시작
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -860,29 +886,82 @@
     });
   }
 
+  let dedupActive = false;
+  let dedupGroups = null; // cached groups from last dedup run
+
+  function makeThumbEl(img, i) {
+    const wrap = document.createElement('div');
+    wrap.className = 'thumb-wrap';
+    const thumbContent = img.isRaw
+      ? `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);font-family:'DM Mono',monospace;">
+          <div style="font-size:11px;color:var(--accent);font-weight:500;">${img.name.split('.').pop().toUpperCase()}</div>
+          <div style="font-size:9px;color:var(--text3);margin-top:2px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${img.name}</div>
+         </div>`
+      : `<img src="${img.src}" alt="${img.name}">`;
+    wrap.innerHTML = thumbContent + `<button class="thumb-remove" onclick="removeImage(event,${i})">×</button>`;
+    return wrap;
+  }
+
   function renderThumbs() {
     const grid = document.getElementById('thumb-grid');
     grid.innerHTML = '';
-    images.forEach((img, i) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'thumb-wrap';
-      const thumbContent = img.isRaw
-        ? `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);font-family:'DM Mono',monospace;">
-            <div style="font-size:11px;color:var(--accent);font-weight:500;">${img.name.split('.').pop().toUpperCase()}</div>
-            <div style="font-size:9px;color:var(--text3);margin-top:2px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${img.name}</div>
-           </div>`
-        : `<img src="${img.src}" alt="${img.name}">`;
-      wrap.innerHTML = thumbContent + `<button class="thumb-remove" onclick="removeImage(event,${i})">×</button>`;
-      grid.appendChild(wrap);
-    });
+
+    if (dedupActive && dedupGroups) {
+      // Render grouped view
+      dedupGroups.forEach(group => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'thumb-group grouped';
+        // Badge
+        const badge = document.createElement('div');
+        badge.className = 'group-badge';
+        badge.textContent = group.length > 1 ? `${group.length}장` : '1장';
+        groupEl.appendChild(badge);
+        group.forEach(idx => {
+          groupEl.appendChild(makeThumbEl(images[idx], idx));
+        });
+        grid.appendChild(groupEl);
+      });
+    } else {
+      // Normal flat view
+      images.forEach((img, i) => {
+        const wrap = makeThumbEl(img, i);
+        grid.appendChild(wrap);
+      });
+    }
+
     const n = images.length;
-    document.getElementById('thumb-count-label').textContent = `${n} photo${n !== 1 ? 's' : ''}`;
-    document.getElementById('total-count').textContent = n;
+    const effectiveN = dedupActive && dedupGroups ? dedupGroups.length : n;
+    document.getElementById('thumb-count-label').textContent =
+      dedupActive && dedupGroups
+        ? `${n}장 → ${dedupGroups.length}그룹`
+        : `${n} photo${n !== 1 ? 's' : ''}`;
+    document.getElementById('total-count').textContent = effectiveN;
     const nInput = document.getElementById('n-input');
-    nInput.max = Math.max(1, n - 1);
-    if (parseInt(nInput.value) >= n) nInput.value = Math.max(1, n - 1);
+    nInput.max = Math.max(1, effectiveN - 1);
+    if (parseInt(nInput.value) >= effectiveN) nInput.value = Math.max(1, effectiveN - 1);
     document.getElementById('thumb-section').style.display = n ? 'block' : 'none';
     document.getElementById('controls').style.display = n > 1 ? 'flex' : 'none';
+  }
+
+  async function toggleDedup() {
+    const btn = document.getElementById('dedup-btn');
+    if (dedupActive) {
+      // Turn off
+      dedupActive = false;
+      dedupGroups = null;
+      btn.classList.remove('active');
+      renderThumbs();
+      return;
+    }
+    // Turn on: compute groups
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner" style="width:10px;height:10px;border-width:1.5px;"></span> 분석 중...`;
+    dedupGroups = await groupSimilarImages(0.92);
+    dedupActive = true;
+    btn.disabled = false;
+    btn.classList.add('active');
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="14" height="14" rx="2"/><path d="M16 3h3a2 2 0 0 1 2 2v14"/></svg> 묶기 해제`;
+    renderThumbs();
   }
 
   function removeImage(e, i) {
@@ -894,6 +973,10 @@
 
   function clearAll() {
     images.length = 0;
+    dedupActive = false;
+    dedupGroups = null;
+    const btn = document.getElementById('dedup-btn');
+    if (btn) { btn.classList.remove('active'); btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="14" height="14" rx="2"/><path d="M16 3h3a2 2 0 0 1 2 2v14"/></svg> 유사 사진 묶기`; }
     renderThumbs();
     document.getElementById('results-section').style.display = 'none';
   }
@@ -984,16 +1067,15 @@
     document.getElementById('results-list').innerHTML = '';
 
     try {
-      // Step 1: group similar images (if toggle is on)
-      const dedupOn = document.getElementById('dedup-checkbox')?.checked !== false;
+      // Step 1: use pre-computed dedup groups or individual
       let groups, dupCount;
-      if (dedupOn) {
-        progressLabel.textContent = '유사 사진 그룹핑 중...';
-        progressPct.textContent = '';
-        progressFill.style.width = '5%';
-        groups = await groupSimilarImages(0.92);
+      if (dedupActive && dedupGroups) {
+        groups = dedupGroups;
         dupCount = images.length - groups.length;
+        progressFill.style.width = '5%';
       } else {
+        progressLabel.textContent = '사진 준비 중...';
+        progressFill.style.width = '5%';
         groups = images.map((_, i) => [i]);
         dupCount = 0;
       }
