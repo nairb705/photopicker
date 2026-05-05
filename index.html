@@ -132,9 +132,16 @@
     }
     .clear-btn:hover { color: var(--danger); }
     .thumb-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-      gap: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    /* Single thumbs (ungrouped) keep consistent size */
+    .thumb-grid > .thumb-wrap {
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
     }
     .thumb-wrap {
       position: relative;
@@ -687,43 +694,73 @@
 
     /* Group container in thumb grid */
     .thumb-group {
-      display: contents; /* default: no visual grouping */
+      display: contents; /* flat, no visual */
     }
+
+    /* Grouped: stacked card look */
     .thumb-group.grouped {
-      display: flex;
-      align-items: flex-start;
-      gap: 3px;
-      background: rgba(200,240,96,0.05);
-      border: 1px solid rgba(200,240,96,0.2);
-      border-radius: var(--radius-sm);
-      padding: 4px;
+      display: inline-flex;
       position: relative;
+      padding: 0;
     }
-    .thumb-group.grouped .group-badge {
-      display: flex;
-    }
+
+    /* Only show badge when group has >1 items */
     .group-badge {
       display: none;
+    }
+    .thumb-group.grouped.multi .group-badge {
+      display: flex;
       position: absolute;
-      top: -8px; left: 4px;
-      font-size: 0.6rem;
+      top: -7px; left: -7px;
+      font-size: 0.58rem;
       font-family: 'DM Mono', monospace;
       background: var(--accent);
       color: var(--accent-text);
-      padding: 1px 6px;
+      padding: 1px 5px;
       border-radius: 20px;
       white-space: nowrap;
-      z-index: 2;
+      z-index: 4;
+      font-weight: 600;
     }
+
+    /* Non-representative thumbs: stack behind the first */
     .thumb-group.grouped .thumb-wrap {
-      flex-shrink: 0;
-      width: 52px; height: 52px;
+      width: 80px; height: 80px;
     }
-    .thumb-group.grouped .thumb-wrap:not(:first-of-type) {
-      opacity: 0.45;
+    .thumb-group.grouped.multi .thumb-wrap:not(:first-of-type) {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      z-index: 0;
+      opacity: 0;
+      pointer-events: none;
     }
-    .thumb-group.grouped .thumb-wrap:not(:first-of-type) .thumb-remove {
-      display: none;
+    /* Shadow layers to suggest stack depth */
+    .thumb-group.grouped.multi::before,
+    .thumb-group.grouped.multi::after {
+      content: '';
+      position: absolute;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(200,240,96,0.25);
+      background: var(--bg3);
+    }
+    .thumb-group.grouped.multi::before {
+      top: 5px; left: 5px;
+      right: -5px; bottom: -5px;
+      z-index: -1;
+    }
+    .thumb-group.grouped.multi::after {
+      top: 9px; left: 9px;
+      right: -9px; bottom: -9px;
+      z-index: -2;
+      opacity: 0.5;
+    }
+    /* Representative thumb: accent border */
+    .thumb-group.grouped.multi .thumb-wrap:first-of-type {
+      position: relative;
+      z-index: 2;
+      border-color: rgba(200,240,96,0.5) !important;
+      box-shadow: 0 0 0 1px rgba(200,240,96,0.2);
     }
 
     @media (max-width: 520px) {
@@ -909,13 +946,18 @@
     if (dedupActive && dedupGroups) {
       // Render grouped view
       dedupGroups.forEach(group => {
+        const isMulti = group.length > 1;
         const groupEl = document.createElement('div');
-        groupEl.className = 'thumb-group grouped';
-        // Badge
-        const badge = document.createElement('div');
-        badge.className = 'group-badge';
-        badge.textContent = group.length > 1 ? `${group.length}장` : '1장';
-        groupEl.appendChild(badge);
+        groupEl.className = 'thumb-group grouped' + (isMulti ? ' multi' : '');
+
+        if (isMulti) {
+          const badge = document.createElement('div');
+          badge.className = 'group-badge';
+          badge.textContent = `${group.length}장`;
+          groupEl.appendChild(badge);
+        }
+
+        // Only render representative (first) visually; rest are hidden via CSS
         group.forEach(idx => {
           groupEl.appendChild(makeThumbEl(images[idx], idx));
         });
