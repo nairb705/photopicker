@@ -692,75 +692,70 @@
     .dedup-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
     .dedup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Group container in thumb grid */
-    .thumb-group {
-      display: contents; /* flat, no visual */
-    }
+    /* ── Group: stack card ── */
+    .thumb-group { display: contents; }
 
-    /* Grouped: stacked card look */
     .thumb-group.grouped {
-      display: inline-flex;
       position: relative;
-      padding: 0;
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
     }
 
-    /* Only show badge when group has >1 items */
+    /* All thumbs inside a group fill the slot */
+    .thumb-group.grouped .thumb-wrap {
+      position: absolute !important;
+      top: 0; left: 0;
+      width: 80px !important;
+      height: 80px !important;
+    }
+
+    /* Representative (first child thumb-wrap) on top */
+    .thumb-group.grouped .thumb-wrap:first-of-type {
+      z-index: 3;
+    }
+
+    /* Stack layers: shift each one slightly */
+    .thumb-group.grouped.multi .thumb-wrap:nth-of-type(2) {
+      top: -3px; left: 3px; z-index: 2;
+      opacity: 1; filter: brightness(0.6);
+      pointer-events: none;
+    }
+    .thumb-group.grouped.multi .thumb-wrap:nth-of-type(3) {
+      top: -6px; left: 6px; z-index: 1;
+      opacity: 1; filter: brightness(0.35);
+      pointer-events: none;
+    }
+    /* Any beyond 3rd: hidden */
+    .thumb-group.grouped.multi .thumb-wrap:nth-of-type(n+4) {
+      display: none;
+    }
+
+    /* Accent border on rep */
+    .thumb-group.grouped.multi .thumb-wrap:first-of-type {
+      border-color: rgba(200,240,96,0.6) !important;
+      box-shadow: 0 0 0 1px rgba(200,240,96,0.2);
+    }
+
+    /* Badge */
     .group-badge {
       display: none;
     }
     .thumb-group.grouped.multi .group-badge {
       display: flex;
+      align-items: center;
       position: absolute;
-      top: -7px; left: -7px;
+      bottom: -7px; right: -7px;
       font-size: 0.58rem;
       font-family: 'DM Mono', monospace;
+      font-weight: 700;
       background: var(--accent);
       color: var(--accent-text);
-      padding: 1px 5px;
+      padding: 1px 6px;
       border-radius: 20px;
+      z-index: 10;
       white-space: nowrap;
-      z-index: 4;
-      font-weight: 600;
-    }
-
-    /* Non-representative thumbs: stack behind the first */
-    .thumb-group.grouped .thumb-wrap {
-      width: 80px; height: 80px;
-    }
-    .thumb-group.grouped.multi .thumb-wrap:not(:first-of-type) {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      z-index: 0;
-      opacity: 0;
       pointer-events: none;
-    }
-    /* Shadow layers to suggest stack depth */
-    .thumb-group.grouped.multi::before,
-    .thumb-group.grouped.multi::after {
-      content: '';
-      position: absolute;
-      border-radius: var(--radius-sm);
-      border: 1px solid rgba(200,240,96,0.25);
-      background: var(--bg3);
-    }
-    .thumb-group.grouped.multi::before {
-      top: 5px; left: 5px;
-      right: -5px; bottom: -5px;
-      z-index: -1;
-    }
-    .thumb-group.grouped.multi::after {
-      top: 9px; left: 9px;
-      right: -9px; bottom: -9px;
-      z-index: -2;
-      opacity: 0.5;
-    }
-    /* Representative thumb: accent border */
-    .thumb-group.grouped.multi .thumb-wrap:first-of-type {
-      position: relative;
-      z-index: 2;
-      border-color: rgba(200,240,96,0.5) !important;
-      box-shadow: 0 0 0 1px rgba(200,240,96,0.2);
     }
 
     @media (max-width: 520px) {
